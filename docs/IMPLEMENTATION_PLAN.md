@@ -49,6 +49,10 @@ Exit check: every loaded amount ties to a document URL and a verbatim header. `d
 
 Exit check: life-to-date rows are absent from the incremental marts. Where Nintendo prints both a year-to-date series and a single quarter, the derived quarter reconciles to the printed quarter or the difference is flagged.
 
+## Monitoring and alerts
+
+`monitoring/` evaluates pipeline health, data quality, freshness, and annual business movements after a successful pipeline run and on demand via `python -m nih monitor run`. Findings persist as fingerprint-deduplicated alerts in `meta.monitoring_alerts` with an audited lifecycle; a repeated evaluation with unchanged data creates no new alerts. Business movements are informational, annual-only, and never inferred from life-to-date rows. Notifications are optional, disabled by default, and covered in [NOTIFICATION_SETUP.md](NOTIFICATION_SETUP.md).
+
 ## Business intelligence dashboard
 
 `streamlit run dashboards/app.py` serves five pages over the official marts: Executive Overview, Hardware & Software, Regional Performance, Financial Intelligence, and Pipeline Health. All official figures are read from PostgreSQL with parameterized queries; nothing is hardcoded. Life-to-date snapshots are never summed or charted as annual sales, and component models are excluded from cross-platform totals. Tableau CSV exports come from `python scripts/export_tableau.py`. See [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md), [DASHBOARD_METRICS.md](DASHBOARD_METRICS.md), and [TABLEAU_INTEGRATION.md](TABLEAU_INTEGRATION.md).

@@ -61,6 +61,18 @@ def main(argv: list[str] | None = None) -> int:
     history = pipeline_commands.add_parser("history", help="Show recent pipeline executions")
     history.add_argument("--limit", type=int, default=20)
     pipeline_commands.add_parser("status", help="Show the latest run, freshness, and issues")
+    monitor = sub.add_parser("monitor", help="Evaluate monitoring rules and inspect alerts")
+    monitor_commands = monitor.add_subparsers(dest="monitor_command", required=True)
+    monitor_run = monitor_commands.add_parser("run", help="Evaluate all monitoring rules and persist alerts")
+    monitor_run.add_argument("--notify", action="store_true", help="Send notifications for new or reopened alerts when enabled")
+    monitor_run.add_argument("--dry-run", action="store_true", help="Record what would be notified without sending anything")
+    monitor_commands.add_parser("status", help="Show active alerts by severity and monitoring health")
+    monitor_history = monitor_commands.add_parser("history", help="Show recent alerts and status transitions")
+    monitor_history.add_argument("--limit", type=int, default=20)
+    ack = monitor_commands.add_parser("ack", help="Acknowledge an alert by fingerprint or id")
+    ack.add_argument("alert")
+    resolve = monitor_commands.add_parser("resolve", help="Resolve an alert by fingerprint or id")
+    resolve.add_argument("alert")
     args = parser.parse_args(argv)
 
     if args.command == "version":
@@ -74,6 +86,8 @@ def main(argv: list[str] | None = None) -> int:
         return _ingest(args.sources, load_warehouse=not args.skip_warehouse)
     if args.command == "pipeline":
         return _pipeline(args)
+    if args.command == "monitor":
+        return _monitor(args)
     parser.error(f"unknown command {args.command}")
     return 2
 
@@ -248,8 +262,113 @@ def _pipeline(args) -> int:
     )
     print(f"dbt_status: {result.dbt_status}")
     print(f"validation_failures: {result.validation_failures}")
+    print(
+        "monitoring: "
+        f"status={result.monitoring_status} findings={result.monitoring_findings} "
+        f"created={result.monitoring_created} resolved={result.monitoring_resolved}"
+    )
     for warning in result.warnings:
         print(f"warning: {warning}")
     if result.error_message:
         print(result.error_message)
     return result.exit_code
+
+
+def _monitor(args) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    from monitoring import engine
+    from monitoring.alerts import AlertStore, ensure_monitoring_tables
+    from nih.db import connect
+
+    try:
+        if args.monitor_command == "run":
+            result = engine.run_evaluation(notify=args.notify, dry_run=args.dry_run)
+            print(f"evaluation_id: {result.evaluation_id}")
+            print(f"status: {result.status}")
+            print(
+                "alerts: "
+                f"findings={result.findings} created={result.created} "
+                f"reopened={result.reopened} updated={result.updated} resolved={result.resolved}"
+            )
+            active = result.active_by_severity
+            print(
+                "active: "
+                f"critical={active.get('critical', 0)} warning={active.get('warning', 0)} "
+                f"info={active.get('info', 0)}"
+            )
+            if result.notifications is not None:
+                notes = result.notifications
+                print(
+                    "notifications: "
+                    f"attempted={notes.attempted} sent={notes.sent} "
+                    f"dry_run={notes.dry_run} skipped={notes.skipped}"
+                )
+            if result.error_message:
+                print(result.error_message)
+            return result.exit_code
+        if args.monitor_command == "status":
+            status = engine.monitoring_status()
+            latest = status["latest_evaluation"]
+            print("Nintendo Intelligence Hub monitoring status")
+            print(f"health: {status['health']}")
+            active = status["active_by_severity"]
+            print(
+                "active alerts: "
+                f"critical={active.get('critical', 0)} warning={active.get('warning', 0)} "
+                f"info={active.get('info', 0)}"
+            )
+            print(f"acknowledged: {status['acknowledged']}  resolved: {status['resolved']}")
+            if latest is None:
+                print("latest evaluation: none")
+            else:
+                print(
+                    f"latest evaluation: {latest['status']} at {latest['started_at']} "
+                    f"(findings {latest['findings']}, created {latest['alerts_created']}, "
+                    f"resolved {latest['alerts_resolved']})"
+                )
+                if latest["error_message"]:
+                    print(f"evaluation error: {latest['error_message']}")
+            return 0
+        if args.monitor_command == "history":
+            alerts = engine.list_alerts(args.limit)
+            events = engine.alert_events(args.limit)
+            if not alerts and not events:
+                print("No monitoring alerts are recorded.")
+                return 0
+            print("Recent alerts")
+            for alert in alerts:
+                print(
+                    f"{alert['alert_id']} {alert['severity']} {alert['status']} {alert['alert_type']} "
+                    f"{alert['platform'] or '-'} {alert['reporting_period'] or '-'} "
+                    f"last={alert['last_detected_at']}"
+                )
+                print(f"  {alert['alert_fingerprint']}")
+                print(f"  {alert['explanation']}")
+            print("Recent transitions")
+            for event in events:
+                print(
+                    f"{event['created_at']} {event['event_type']} {event['alert_type']} "
+                    f"({event['severity']}) by {event['actor']}"
+                )
+            return 0
+        # ack / resolve
+        with connect() as connection:
+            ensure_monitoring_tables(connection)
+            connection.commit()
+            store = AlertStore(connection)
+            changed = (
+                store.acknowledge(args.alert, actor="cli")
+                if args.monitor_command == "ack"
+                else store.resolve(args.alert, actor="cli")
+            )
+        if changed is None:
+            print(f"No alert matches {args.alert}")
+            return 1
+        print(
+            f"alert {changed['alert_id']} ({changed['fingerprint']}): "
+            f"{changed['from']} -> {changed['to']}"
+        )
+        return 0
+    except Exception as exc:
+        print(f"monitor {args.monitor_command} failed: {exc}")
+        return 2

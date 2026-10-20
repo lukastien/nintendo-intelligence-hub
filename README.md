@@ -64,7 +64,7 @@ dbt build --project-dir transformations/dbt --profiles-dir transformations/dbt
 streamlit run dashboards/app.py
 ```
 
-The dashboard has five pages — Executive Overview, Hardware & Software, Regional Performance, Financial Intelligence, and Pipeline Health — documented in [docs/DASHBOARD_GUIDE.md](docs/DASHBOARD_GUIDE.md) and [docs/DASHBOARD_METRICS.md](docs/DASHBOARD_METRICS.md). Tableau-ready exports and connection instructions are in [docs/TABLEAU_INTEGRATION.md](docs/TABLEAU_INTEGRATION.md).
+Monitoring runs after a successful pipeline build and on demand with `python -m nih monitor run`; `python -m nih monitor status`, `history`, `ack`, and `resolve` inspect and manage alerts in `meta.monitoring_alerts`. Rules, thresholds, and notification setup are in [docs/MONITORING_ARCHITECTURE.md](docs/MONITORING_ARCHITECTURE.md), [docs/ALERT_DEFINITIONS.md](docs/ALERT_DEFINITIONS.md), and [docs/NOTIFICATION_SETUP.md](docs/NOTIFICATION_SETUP.md). The dashboard has five pages — Executive Overview, Hardware & Software, Regional Performance, Financial Intelligence, and Pipeline Health — documented in [docs/DASHBOARD_GUIDE.md](docs/DASHBOARD_GUIDE.md) and [docs/DASHBOARD_METRICS.md](docs/DASHBOARD_METRICS.md). Tableau-ready exports and connection instructions are in [docs/TABLEAU_INTEGRATION.md](docs/TABLEAU_INTEGRATION.md).
 
 `make install`, `make db-up`, `make db-init`, `make test`, `make dbt-build`, and `make app` wrap those commands.
 

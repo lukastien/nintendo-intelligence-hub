@@ -84,6 +84,16 @@ def _documents():
     return queries.document_as_ofs()
 
 
+@st.cache_data(ttl=120, show_spinner=False)
+def _alerts(limit: int = 50):
+    return queries.monitoring_alerts(limit)
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def _evaluations(limit: int = 10):
+    return queries.monitoring_evaluations(limit)
+
+
 def _platform_labels(frame: pd.DataFrame) -> dict[str, str]:
     if frame.empty:
         return {}
@@ -484,6 +494,79 @@ def pipeline_health() -> None:
             st.subheader("Optional source warnings")
             for warning in warnings:
                 st.markdown(f'<div class="nih-note"><span class="nih-status nih-warn">warning</span> {warning}</div>', unsafe_allow_html=True)
+
+    st.subheader("Monitoring and alerts")
+    try:
+        from monitoring.engine import monitoring_status
+
+        monitor = monitoring_status()
+        alerts = _alerts(500)
+        evaluations = _evaluations(10)
+    except Exception as exc:
+        st.warning(f"Monitoring tables are unavailable: {exc}. Run `python -m nih monitor run`.")
+        alerts = pd.DataFrame()
+        evaluations = pd.DataFrame()
+        monitor = None
+    if monitor is not None:
+        active = monitor["active_by_severity"]
+        health = monitor["health"]
+        pill = {"healthy": "nih-ok", "warning": "nih-warn", "degraded": "nih-warn", "critical": "nih-bad"}[health]
+        st.markdown(f'<span class="nih-status {pill}">monitoring: {health}</span>', unsafe_allow_html=True)
+        cards = st.columns(4)
+        for column, severity in zip(cards, ("critical", "warning", "info", "resolved"), strict=True):
+            with column:
+                if severity == "resolved":
+                    components.kpi_card(st, "Resolved alerts", format_count(monitor["resolved"]), "Full history is kept in meta.monitoring_alerts")
+                else:
+                    components.kpi_card(st, f"Active {severity}", format_count(active.get(severity, 0)), "Open = active or acknowledged")
+        latest_eval = monitor["latest_evaluation"]
+        if latest_eval:
+            st.caption(
+                f"Latest monitoring evaluation: {latest_eval['status']} at {latest_eval['started_at']} · "
+                f"findings {latest_eval['findings']} · created {latest_eval['alerts_created']} · "
+                f"reopened {latest_eval['alerts_reopened']} · resolved {latest_eval['alerts_resolved']}"
+            )
+        if not evaluations.empty:
+            st.dataframe(
+                evaluations[["started_at", "status", "findings", "alerts_created", "alerts_reopened", "alerts_resolved"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+    if alerts.empty:
+        st.info("No alerts are recorded. Run `python -m nih monitor run` to evaluate the warehouse.")
+    else:
+        open_alerts = alerts[alerts["status"].isin(["active", "acknowledged"])]
+        category_labels = {
+            "operational": "Confirmed operational failures",
+            "data_quality": "Data-quality warnings",
+            "business": "Statistical business anomalies (informational)",
+        }
+        for category in ("operational", "data_quality", "business"):
+            subset = open_alerts[open_alerts["category"] == category] if not open_alerts.empty else open_alerts
+            st.markdown(f"**{category_labels[category]}** — {len(subset)} open")
+            if subset.empty:
+                st.caption("None open.")
+                continue
+            for row in subset.head(10).itertuples():
+                pill = {"critical": "nih-bad", "warning": "nih-warn", "info": "nih-ok"}[row.severity]
+                st.markdown(
+                    f'<div class="nih-note"><span class="nih-status {pill}">{row.severity}</span> '
+                    f"<strong>{row.alert_type}</strong> · {row.platform or '-'} · {row.reporting_period or '-'}<br>"
+                    f"{row.explanation}<br>"
+                    f"<small>Source: {row.source_name or '-'} · Document: {row.source_document_id or '-'} · "
+                    f"First detected: {row.first_detected_at} · Seen {row.detection_count} time(s)</small></div>",
+                    unsafe_allow_html=True,
+                )
+        with st.expander("Alert history (all statuses)"):
+            st.dataframe(
+                alerts[["alert_id", "severity", "status", "category", "alert_type", "platform", "reporting_period", "first_detected_at", "last_detected_at"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        st.caption(
+            "Business anomalies are informational signals from annual flows only. They are not proof of bad data. "
+            "Synthetic weekly rows are never evaluated as Nintendo business findings."
+        )
 
     st.subheader("Official source freshness")
     from nih.pipeline import format_freshness, freshness_findings

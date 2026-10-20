@@ -75,6 +75,10 @@ class PipelineResult:
     duration_seconds: float = 0
     warnings: list[str] = field(default_factory=list)
     mart_counts: dict[str, int] = field(default_factory=dict)
+    monitoring_status: str = "not_run"
+    monitoring_findings: int = 0
+    monitoring_created: int = 0
+    monitoring_resolved: int = 0
 
 
 def configure_logging() -> None:
@@ -156,6 +160,7 @@ def run_pipeline(
                 error_message=message,
                 validation_failures=1,
             )
+            _record_failure_alert(run_id, message, settings)
             return PipelineResult(run_id, "failed", False, 2, message)
         _ensure_pipeline_table(connection)
         _mark_interrupted(connection)
@@ -177,6 +182,8 @@ def run_pipeline(
             logger.exception("pipeline failed")
             result = _failed_result(run_id, started, str(exc))
         _finish(connection, result)
+        if not result.ok:
+            _record_failure_alert(run_id, result.error_message, settings)
         log_event(
             "pipeline_finished",
             run_id=run_id,
@@ -235,6 +242,23 @@ def pipeline_status(today: date | None = None, settings: Settings | None = None)
         "quarterly marts: empty until a source file contains q1, q1_q2, or q1_q3 columns. "
         "An empty quarterly mart is not a freshness failure."
     )
+    try:
+        from monitoring.engine import monitoring_status
+
+        monitor = monitoring_status(settings)
+        active = monitor["active_by_severity"]
+        lines.append(
+            "monitoring: "
+            f"health={monitor['health']} critical={active.get('critical', 0)} "
+            f"warning={active.get('warning', 0)} info={active.get('info', 0)}"
+        )
+        latest_eval = monitor["latest_evaluation"]
+        if latest_eval:
+            lines.append(
+                f"latest monitoring evaluation: {latest_eval['status']} at {latest_eval['started_at']}"
+            )
+    except Exception as exc:
+        lines.append(f"monitoring: unavailable ({exc})")
     issues = outstanding_issues(runs[0] if runs else None, documents, today)
     if issues:
         lines.append("outstanding issues:")
@@ -551,6 +575,33 @@ def _execute(
     elif verify_marts and dbt_result.status != "success":
         log_event("mart_verification_skipped", dbt_status=dbt_result.status)
 
+    monitoring_status = "not_run"
+    monitoring_findings = monitoring_created = monitoring_resolved = 0
+    if not problems and verify_marts and dbt_result.status == "success":
+        # Post-dbt monitoring. Imported lazily: monitoring.engine reads
+        # nih.pipeline freshness helpers, so a top-level import would cycle.
+        try:
+            from monitoring.engine import run_evaluation
+
+            evaluation = run_evaluation(pipeline_run_id=run_id, settings=settings)
+            monitoring_status = evaluation.status
+            monitoring_findings = evaluation.findings
+            monitoring_created = evaluation.created
+            monitoring_resolved = evaluation.resolved
+            log_event(
+                "monitoring_finished",
+                status=evaluation.status,
+                findings=evaluation.findings,
+                created=evaluation.created,
+                resolved=evaluation.resolved,
+            )
+            if not evaluation.ok:
+                problems.append(f"monitoring evaluation failed: {evaluation.error_message}")
+        except Exception as exc:
+            monitoring_status = "failed"
+            problems.append(f"monitoring evaluation failed: {exc}")
+            logger.exception("monitoring evaluation failed")
+
     error_message = "\n".join(problems)[:4000]
     status = "failed" if problems else "succeeded"
     return PipelineResult(
@@ -570,7 +621,25 @@ def _execute(
         duration_seconds=_duration(started),
         warnings=warnings,
         mart_counts=mart_counts,
+        monitoring_status=monitoring_status,
+        monitoring_findings=monitoring_findings,
+        monitoring_created=monitoring_created,
+        monitoring_resolved=monitoring_resolved,
     )
+
+
+def _record_failure_alert(run_id: str | None, message: str, settings: Settings) -> None:
+    """Record a critical alert for a failed run. Failures here are logged."""
+    try:
+        from monitoring.engine import record_pipeline_failure
+
+        record_pipeline_failure(
+            pipeline_run_id=run_id,
+            message=message or "pipeline run failed",
+            settings=settings,
+        )
+    except Exception:
+        logger.exception("could not record the pipeline failure alert")
 
 
 def _failed_result(run_id: str, started: datetime, message: str) -> PipelineResult:
@@ -706,6 +775,12 @@ def _finish(connection, result: PipelineResult) -> None:
     detail = {
         "warnings": result.warnings,
         "marts": result.mart_counts,
+        "monitoring": {
+            "status": result.monitoring_status,
+            "findings": result.monitoring_findings,
+            "created": result.monitoring_created,
+            "resolved": result.monitoring_resolved,
+        },
     }
     with connection.cursor() as cursor:
         cursor.execute(

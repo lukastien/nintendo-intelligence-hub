@@ -159,6 +159,39 @@ def pipeline_runs(limit: int = 20, *, settings: Settings | None = None) -> pd.Da
     )
 
 
+def monitoring_alerts(limit: int = 50, *, settings: Settings | None = None) -> pd.DataFrame:
+    return _query(
+        """
+        select
+            alert_id, alert_fingerprint, alert_type, category, severity, status,
+            source_name, metric_name, platform, region, reporting_period,
+            observed_value, expected_value, threshold, explanation,
+            source_document_id, pipeline_run_id, first_detected_at, last_detected_at,
+            acknowledged_at, resolved_at, detection_count
+        from meta.monitoring_alerts
+        order by last_detected_at desc
+        limit %s
+        """,
+        (int(limit),),
+        settings,
+    )
+
+
+def monitoring_evaluations(limit: int = 10, *, settings: Settings | None = None) -> pd.DataFrame:
+    return _query(
+        """
+        select
+            evaluation_id, pipeline_run_id, started_at, finished_at, status, findings,
+            alerts_created, alerts_reopened, alerts_updated, alerts_resolved, error_message
+        from meta.monitoring_evaluations
+        order by started_at desc
+        limit %s
+        """,
+        (int(limit),),
+        settings,
+    )
+
+
 def warehouse_counts(*, settings: Settings | None = None) -> dict[str, int]:
     frame = _query(
         """
