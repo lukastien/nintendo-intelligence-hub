@@ -83,3 +83,24 @@ def format_count(value: int | float | None) -> str:
     if value is None:
         return "—"
     return f"{int(value):,}"
+
+
+def format_timestamp(value) -> str:
+    """Short human-readable timestamp, e.g. '20 Oct 2026 · 18:40 UTC'.
+
+    Accepts datetimes, pandas timestamps, and ISO strings. Naive values
+    are shown as-is without inventing a timezone; unparseable or missing
+    values render as an em dash rather than a raw repr.
+    """
+    if value is None:
+        return "—"
+    try:
+        import pandas as pd
+
+        stamp = pd.Timestamp(value)
+        if pd.isna(stamp):
+            return "—"
+    except Exception:
+        return str(value)
+    suffix = " UTC" if stamp.tzinfo is not None else ""
+    return stamp.strftime("%d %b %Y · %H:%M") + suffix

@@ -22,6 +22,7 @@ from dashboards.formatting import (
     format_count,
     format_percent,
     format_ratio,
+    format_timestamp,
     format_units,
     format_yen,
 )
@@ -164,28 +165,22 @@ def executive_overview() -> None:
     software_yoy = calc.comparable_yoy(annual, selected, "sw_units_sell_in")
     fin = calc.financial_for_year(financial, selected)
 
-    cards = st.columns(4)
-    with cards[0]:
-        note = "Comparable YoY unavailable" if hardware_yoy is None else f"YoY {format_percent(hardware_yoy['growth'])} on the same platform set"
-        components.kpi_card(st, f"Worldwide hardware · {fiscal_label(selected)}", format_units(hardware_total), note)
-    with cards[1]:
-        note = "Comparable YoY unavailable" if software_yoy is None else f"YoY {format_percent(software_yoy['growth'])} on the same platform set"
-        components.kpi_card(st, f"Worldwide software · {fiscal_label(selected)}", format_units(software_total), note)
-    with cards[2]:
-        components.kpi_card(
-            st,
-            "Consolidated net sales",
-            format_yen(fin["net_sales_yen"] if fin else None),
-            "Nintendo Co., Ltd. group, worldwide (JPY). Not Nintendo of America revenue.",
-        )
-    with cards[3]:
-        margin = fin["operating_margin"] if fin else None
-        components.kpi_card(
-            st,
-            "Operating profit · margin",
-            f"{format_yen(fin['operating_profit_yen'] if fin else None)} · {format_percent(margin, 1).replace('+', '')}" if fin and margin is not None else format_yen(fin["operating_profit_yen"] if fin else None),
-            "Margin is calculated from the two consolidated annual flows.",
-        )
+    hw_note = "Comparable YoY unavailable" if hardware_yoy is None else f"YoY {format_percent(hardware_yoy['growth'])} on the same platform set"
+    sw_note = "Comparable YoY unavailable" if software_yoy is None else f"YoY {format_percent(software_yoy['growth'])} on the same platform set"
+    margin = fin["operating_margin"] if fin else None
+    components.kpi_grid(
+        st,
+        [
+            (f"Worldwide hardware · {fiscal_label(selected)}", format_units(hardware_total), hw_note),
+            (f"Worldwide software · {fiscal_label(selected)}", format_units(software_total), sw_note),
+            ("Consolidated net sales", format_yen(fin["net_sales_yen"] if fin else None), "Nintendo Co., Ltd. group, worldwide (JPY). Not Nintendo of America revenue."),
+            (
+                "Operating profit · margin",
+                f"{format_yen(fin['operating_profit_yen'] if fin else None)} · {format_percent(margin, 1).replace('+', '')}" if fin and margin is not None else format_yen(fin["operating_profit_yen"] if fin else None),
+                "Margin is calculated from the two consolidated annual flows.",
+            ),
+        ],
+    )
     if hardware_yoy is None or software_yoy is None:
         st.caption(
             "A comparable year-over-year total is shown only when the same non-component platform scopes "
@@ -243,7 +238,12 @@ def hardware_software() -> None:
         st.warning("The hardware/software trend mart returned no rows.")
         return
     labels = _platform_labels(trends)
-    platform = st.selectbox("Platform scope", list(labels), format_func=lambda code: labels[code])
+    platform_codes = list(labels)
+    # Default to the Switch family, whose latest fiscal years contain the
+    # most meaningful current observations; every historical scope stays
+    # selectable. Alphabetical order would open on the NES tail years.
+    default_platform = platform_codes.index("NSW_FAMILY") if "NSW_FAMILY" in platform_codes else 0
+    platform = st.selectbox("Platform scope", platform_codes, index=default_platform, format_func=lambda code: labels[code])
     regions = sorted({str(r) for r in trends["region_code"].dropna().unique()})
     region = st.selectbox("Region", regions, index=regions.index("GLOBAL") if "GLOBAL" in regions else 0)
     frame = calc.filter_annual(trends, platforms=platform, regions=region) if "observation_type" in trends else trends[(trends["platform_code"] == platform) & (trends["region_code"] == region)]
@@ -385,16 +385,13 @@ def financial_intelligence() -> None:
     selected = st.selectbox("KPI fiscal year", [int(y) for y in frame["fiscal_year_ending"]], index=len(frame) - 1, format_func=fiscal_label)
     fin = calc.financial_for_year(financial, selected)
 
-    cards = st.columns(4)
     items = [
-        ("Net sales", format_yen(fin["net_sales_yen"] if fin else None), "Consolidated (JPY)"),
-        ("Operating profit", format_yen(fin["operating_profit_yen"] if fin else None), "Consolidated (JPY)"),
-        ("Ordinary profit", format_yen(fin["ordinary_profit_yen"] if fin else None), "Consolidated (JPY)"),
-        ("Profit attributable to owners", format_yen(fin["profit_attributable_to_owners_yen"] if fin else None), "Consolidated (JPY)"),
+        (f"Net sales · {fiscal_label(selected)}", format_yen(fin["net_sales_yen"] if fin else None), "Consolidated (JPY)"),
+        (f"Operating profit · {fiscal_label(selected)}", format_yen(fin["operating_profit_yen"] if fin else None), "Consolidated (JPY)"),
+        (f"Ordinary profit · {fiscal_label(selected)}", format_yen(fin["ordinary_profit_yen"] if fin else None), "Consolidated (JPY)"),
+        (f"Profit attributable to owners · {fiscal_label(selected)}", format_yen(fin["profit_attributable_to_owners_yen"] if fin else None), "Consolidated (JPY)"),
     ]
-    for column, (label, value, note) in zip(cards, items, strict=True):
-        with column:
-            components.kpi_card(st, f"{label} · {fiscal_label(selected)}", value, note)
+    components.kpi_grid(st, items)
     if fin:
         margin_cards = st.columns(2)
         with margin_cards[0]:
@@ -466,21 +463,20 @@ def pipeline_health() -> None:
         st.markdown(components.status_pill(status), unsafe_allow_html=True)
         succeeded = runs[runs["status"] == "succeeded"]
         last_success = succeeded.iloc[0] if not succeeded.empty else None
-        cards = st.columns(4)
-        with cards[0]:
-            components.kpi_card(st, "Latest run", status, str(latest["started_at"]))
-        with cards[1]:
-            components.kpi_card(st, "Last successful run", str(last_success["started_at"]) if last_success is not None else "None recorded", "From meta.pipeline_runs")
-        with cards[2]:
-            duration = latest.get("duration_seconds")
-            components.kpi_card(st, "Latest duration", "—" if duration is None or pd.isna(duration) else f"{float(duration):.1f}s", f"dbt: {latest['dbt_status']}")
-        with cards[3]:
-            components.kpi_card(
-                st,
-                "Latest records",
-                f"{format_count(latest['records_extracted'])} extracted",
-                f"inserted {format_count(latest['records_inserted'])} · updated {format_count(latest['records_updated'])} · unchanged {format_count(latest['records_unchanged'])} · rejected {format_count(latest['records_rejected'])}",
-            )
+        duration = latest.get("duration_seconds")
+        components.kpi_grid(
+            st,
+            [
+                ("Latest run", status, format_timestamp(latest["started_at"])),
+                ("Last successful run", format_timestamp(last_success["started_at"]) if last_success is not None else "None recorded", "From meta.pipeline_runs"),
+                ("Latest duration", "—" if duration is None or pd.isna(duration) else f"{float(duration):.1f}s", f"dbt: {latest['dbt_status']}"),
+                (
+                    "Latest records",
+                    f"{format_count(latest['records_extracted'])} extracted",
+                    f"inserted {format_count(latest['records_inserted'])} · updated {format_count(latest['records_updated'])} · unchanged {format_count(latest['records_unchanged'])} · rejected {format_count(latest['records_rejected'])}",
+                ),
+            ],
+        )
         history = runs[[
             "started_at", "status", "duration_seconds", "records_extracted", "records_inserted",
             "records_updated", "records_unchanged", "records_rejected", "dbt_status", "validation_failures",
@@ -518,17 +514,17 @@ def pipeline_health() -> None:
         health = monitor["health"]
         pill = {"healthy": "nih-ok", "warning": "nih-warn", "degraded": "nih-warn", "critical": "nih-bad"}[health]
         st.markdown(f'<span class="nih-status {pill}">monitoring: {health}</span>', unsafe_allow_html=True)
-        cards = st.columns(4)
-        for column, severity in zip(cards, ("critical", "warning", "info", "resolved"), strict=True):
-            with column:
-                if severity == "resolved":
-                    components.kpi_card(st, "Resolved alerts", format_count(monitor["resolved"]), "Full history is kept in meta.monitoring_alerts")
-                else:
-                    components.kpi_card(st, f"Active {severity}", format_count(active.get(severity, 0)), "Open = active or acknowledged")
+        components.kpi_grid(
+            st,
+            [
+                *[(f"Active {severity}", format_count(active.get(severity, 0)), "Open = active or acknowledged") for severity in ("critical", "warning", "info")],
+                ("Resolved alerts", format_count(monitor["resolved"]), "Full history is kept in meta.monitoring_alerts"),
+            ],
+        )
         latest_eval = monitor["latest_evaluation"]
         if latest_eval:
             st.caption(
-                f"Latest monitoring evaluation: {latest_eval['status']} at {latest_eval['started_at']} · "
+                f"Latest monitoring evaluation: {latest_eval['status']} at {format_timestamp(latest_eval['started_at'])} · "
                 f"findings {latest_eval['findings']} · created {latest_eval['alerts_created']} · "
                 f"reopened {latest_eval['alerts_reopened']} · resolved {latest_eval['alerts_resolved']}"
             )
@@ -599,24 +595,44 @@ def pipeline_health() -> None:
     st.caption("dbt tests require every official mart row to carry source_class = official_ir and fail if a synthetic label appears there.")
 
 
+def _query_attr(name: str):
+    """Return a dashboards.queries function, reloading once if stale.
+
+    Streamlit reruns this script on file changes but never reloads
+    already-imported packages, so a long-running server can hold a
+    `dashboards.queries` module that predates newer query functions
+    (observed as: no attribute 'forecast_runs'). Reloading the module
+    once heals that state; a genuine absence still raises.
+    """
+    import importlib
+
+    fn = getattr(queries, name, None)
+    if fn is None:
+        importlib.reload(queries)
+        fn = getattr(queries, name, None)
+    if fn is None:
+        raise AttributeError(f"dashboards.queries has no attribute {name!r}")
+    return fn
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _forecast_runs(limit: int = 10):
-    return queries.forecast_runs(limit)
+    return _query_attr("forecast_runs")(limit)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _forecasts(run_id: str):
-    return queries.forecasts_for_run(run_id)
+    return _query_attr("forecasts_for_run")(run_id)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _evaluations(run_id: str):
-    return queries.series_evaluations_for_run(run_id)
+def _forecast_evaluations(run_id: str):
+    return _query_attr("series_evaluations_for_run")(run_id)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _folds(run_id: str):
-    return queries.backtest_folds_for_run(run_id)
+def _forecast_folds(run_id: str):
+    return _query_attr("backtest_folds_for_run")(run_id)
 
 
 def _actuals_for_series(series_key: str) -> pd.DataFrame:
@@ -653,13 +669,13 @@ def predictive_analytics() -> None:
     run = runs.iloc[0]
     run_id = str(run["run_id"])
     st.caption(
-        f"Latest forecast run {run_id[:8]} · {run['started_at']} · model version {run['model_version']} · "
+        f"Latest forecast run {run_id[:8]} · {format_timestamp(run['started_at'])} · model version {run['model_version']} · "
         f"series: {run['series_forecast']} selected, {run['series_limited']} limited, "
         f"{run['series_ineligible']} ineligible of {run['series_total']}"
     )
     forecasts = _forecasts(run_id)
-    evaluations = _evaluations(run_id)
-    folds = _folds(run_id)
+    evaluations = _forecast_evaluations(run_id)
+    folds = _forecast_folds(run_id)
     if forecasts.empty:
         st.info("The latest run produced no forecasts. See the methodology notes below.")
         return
@@ -677,16 +693,16 @@ def predictive_analytics() -> None:
     series_forecasts = forecasts[forecasts["series_key"] == chosen].sort_values("forecast_year")
     first = series_forecasts.iloc[0]
     actuals = _actuals_for_series(chosen)
-    cards = st.columns(4)
-    with cards[0]:
-        components.kpi_card(st, "Training observations", format_count(int(first["train_observations"])), f"FY3/{int(first['train_start_year'])}–FY3/{int(first['train_end_year'])} annual flows only")
-    with cards[1]:
-        components.kpi_card(st, "Selected model", str(first["selected_model"]), str(first["eligibility_note"])[:120])
-    with cards[2]:
-        components.kpi_card(st, "Backtest folds", format_count(int(first["backtest_folds"])), "Expanding window; training uses earlier years only")
-    with cards[3]:
-        rmse = first["backtest_rmse"]
-        components.kpi_card(st, "Backtest RMSE", "—" if pd.isna(rmse) else f"{rmse:,.3g}", "One-year-ahead historical errors")
+    rmse = first["backtest_rmse"]
+    components.kpi_grid(
+        st,
+        [
+            ("Training observations", format_count(int(first["train_observations"])), f"FY3/{int(first['train_start_year'])}–FY3/{int(first['train_end_year'])} annual flows only"),
+            ("Selected model", str(first["selected_model"]), str(first["eligibility_note"])[:120]),
+            ("Backtest folds", format_count(int(first["backtest_folds"])), "Expanding window; training uses earlier years only"),
+            ("Backtest RMSE", "—" if pd.isna(rmse) else f"{rmse:,.3g}", "One-year-ahead historical errors"),
+        ],
+    )
     _chart_block(
         f"Reported actuals and forecast — {chosen}",
         charts.forecast_chart(actuals, series_forecasts, title=chosen, y_title=str(first["metric_name"])),
@@ -787,7 +803,7 @@ def main() -> None:
         if queries.database_available():
             refreshed = _refresh()
             st.success("PostgreSQL: connected")
-            st.caption(f"Most recent successful pipeline finish: {refreshed if refreshed is not None else 'not recorded'}")
+            st.caption(f"Most recent successful pipeline finish: {format_timestamp(refreshed) if refreshed is not None else 'not recorded'}")
             try:
                 counts = _counts()
                 st.caption(

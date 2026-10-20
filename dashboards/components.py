@@ -15,10 +15,13 @@ CSS = """
   .nih-kicker { color:#E60012; font-size:0.78rem; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; }
   .nih-subtitle { color:#5B6470; font-size:1rem; margin-top:-0.4rem; }
   .nih-card { background:#FFFFFF; border:1px solid #E8E8E6; border-top:3px solid #E60012;
-              border-radius:10px; padding:1rem 1.1rem; min-height:7.2rem; }
-  .nih-card .label { color:#5B6470; font-size:0.78rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
-  .nih-card .value { color:#232326; font-size:1.65rem; font-weight:750; line-height:1.15; margin-top:0.35rem; }
-  .nih-card .note { color:#5B6470; font-size:0.82rem; margin-top:0.3rem; }
+              border-radius:10px; padding:1rem 1.1rem; min-height:7.2rem; overflow:hidden; }
+  .nih-card .label { color:#5B6470; font-size:0.78rem; font-weight:700; letter-spacing:0.08em;
+                     text-transform:uppercase; overflow-wrap:break-word; }
+  .nih-card .value { color:#232326; font-weight:750; line-height:1.15; margin-top:0.35rem;
+                     font-size:clamp(1.2rem, 1.1rem + 0.9vw, 1.65rem);
+                     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .nih-card .note { color:#5B6470; font-size:0.82rem; margin-top:0.3rem; overflow-wrap:break-word; }
   .nih-status { display:inline-block; border-radius:999px; padding:0.18rem 0.65rem; font-size:0.8rem; font-weight:700; }
   .nih-ok { background:#E7F5EA; color:#176B2D; }
   .nih-bad { background:#FDE8E9; color:#9B111C; }
@@ -50,11 +53,26 @@ def kpi_card(st, label: str, value: str, note: str = "") -> None:
     st.markdown(
         '<div class="nih-card">'
         f'<div class="label">{html.escape(label)}</div>'
-        f'<div class="value">{html.escape(value)}</div>'
-        f'<div class="note">{html.escape(note)}</div>'
+        f'<div class="value" title="{html.escape(value, quote=True)}">{html.escape(value)}</div>'
+        f'<div class="note" title="{html.escape(note, quote=True)}">{html.escape(note)}</div>'
         "</div>",
         unsafe_allow_html=True,
     )
+
+
+def kpi_grid(st, items: list[tuple[str, str, str]], per_row: int = 2) -> None:
+    """Render KPI cards in rows of at most `per_row` columns.
+
+    Four-across rows made cards too narrow for timestamps and long
+    values at laptop and tablet widths; two-across keeps labels and
+    numbers on one line. Items are (label, value, note) tuples.
+    """
+    for start in range(0, len(items), per_row):
+        row = items[start:start + per_row]
+        columns = st.columns(len(row))
+        for column, (label, value, note) in zip(columns, row, strict=True):
+            with column:
+                kpi_card(st, label, value, note)
 
 
 def status_pill(status: str) -> str:
