@@ -1,0 +1,6 @@
+region_code,region_name,is_aggregate,aggregate_note,sort_order
+JPN,Japan,false,Sales region on Nintendo IR unit and geographical tables.,1
+AMR,The Americas,false,Consolidated sales region presented by Nintendo IR.,2
+EUR,Europe,false,Sales region on Nintendo IR unit and geographical tables.,3
+OTH,Other,false,Sales region on Nintendo IR unit and geographical tables.,4
+GLOBAL,Worldwide total,true,Worldwide total. Keep it separate from the four regional rows.,5

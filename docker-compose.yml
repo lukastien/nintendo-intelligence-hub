@@ -1,0 +1,23 @@
+name: nintendo-intel
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nintendo-intel-postgres
+    environment:
+      POSTGRES_USER: nih
+      POSTGRES_PASSWORD: nih_local_only
+      POSTGRES_DB: nintendo_intel
+    ports:
+      - "54329:5432"
+    volumes:
+      - nintendo_intel_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nih -d nintendo_intel"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  nintendo_intel_pg:

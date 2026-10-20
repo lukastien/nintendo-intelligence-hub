@@ -1,0 +1,115 @@
+version: 2
+
+models:
+  - name: stg_official__unit_sales
+    description: "GRAIN: one official sell-in disclosure row. Year-to-date spans stay cumulative."
+    columns:
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+  - name: stg_official__financial_line
+    description: "GRAIN: one official consolidated financial disclosure row, including stocks."
+    columns:
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+      - name: entity_code
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["nintendo_co_ltd_consolidated"]
+  - name: stg_simulated__weekly_sell_through
+    description: "GRAIN: one synthetic weekly sell-through row."
+    columns:
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["simulated_operational"]
+          - not_null
+      - name: disclaimer
+        tests:
+          - not_null
+  - name: unit_sales_incremental_quarter
+    description: >
+      GRAIN: one derived fiscal quarter per fiscal year, metric, product grain,
+      platform scope, region scope, and optional title. Built from adjacent
+      year-to-date official disclosures. Life-to-date rows, forecasts, and
+      single-quarter disclosures stay out of this mart. Q1 uses the Q1
+      year-to-date total. Later quarters are the difference from the previous span.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+      - name: derivation_method
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["ytd_equals_quarter", "difference_of_ytd"]
+      - name: quality_flag
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["ok", "restatement_or_revision"]
+  - name: financial_flow_incremental_quarter
+    description: >
+      GRAIN: one derived fiscal quarter per fiscal year, additive statement line,
+      and region scope. Stocks and non-additive metrics are excluded. The span
+      rules match the unit incremental mart.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+      - name: derivation_method
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["ytd_equals_quarter", "difference_of_ytd"]
+  - name: financial_line_as_disclosed
+    description: >
+      GRAIN: one official financial disclosure, unchanged. This mart keeps the
+      printed span, including year-to-date totals, life-to-date rows, forecasts,
+      and balance-sheet stocks.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+  - name: weekly_sell_through
+    description: >
+      GRAIN: one synthetic sell-through quantity per ISO week, SKU, simulated
+      region, and channel. This mart is isolated from reported results.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["simulated_operational"]
+      - name: disclaimer
+        tests:
+          - not_null

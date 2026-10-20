@@ -1,0 +1,9 @@
+warehouse_target: postgres
+postgres_host: localhost
+postgres_port: 54329
+postgres_db: nintendo_intel
+postgres_user: nih
+postgres_password: nih_local_only
+bigquery_project:
+bigquery_dataset: nintendo_intel
+bigquery_location: US

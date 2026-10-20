@@ -1,0 +1,107 @@
+sources:
+  - source_id: nintendo_ir_home
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Investor relations home
+    url: https://www.nintendo.co.jp/ir/en/index.html
+    grain: Landing page for official disclosures. It contains no measure grain of its own.
+    loads_measures_in_foundation: false
+  - source_id: nintendo_financial_data
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Financial data index
+    url: https://www.nintendo.co.jp/ir/en/finance/index.html
+    grain: >
+      Index of financial highlights, dedicated video game sales units, and
+      top-selling title sales. Each linked table keeps the period label printed
+      on that table.
+    loads_measures_in_foundation: false
+  - source_id: nintendo_dedicated_unit_sales
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Dedicated video game sales units
+    url: https://www.nintendo.co.jp/ir/en/finance/hard_soft/index.html
+    grain: >
+      Worldwide life-to-date hardware and software unit totals as of the date
+      printed on the page. Life-to-date is a separate grain from fiscal-year
+      and year-to-date sell-in.
+    loads_measures_in_foundation: false
+  - source_id: nintendo_historical_region_sales
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Historical consolidated sales transition by region
+    url: https://www.nintendo.co.jp/ir/en/finance/historical_data/index.html
+    grain: >
+      Fiscal-year unit sales by region, plus a life-to-date column. The annual
+      column is the flow for that fiscal year. The life-to-date column is the
+      accumulated total. Historical tables are printed in units of ten thousand.
+    loads_measures_in_foundation: false
+  - source_id: nintendo_historical_income
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Consolidated statements of income transition
+    url: https://www.nintendo.co.jp/ir/en/finance/historical_data/index.html
+    grain: >
+      One consolidated yen flow for one March 31 fiscal year. The workbook
+      prints millions of yen. August year-ends and the seven-month FY3/1990
+      stub are rejected. Ratio rows are not yen amounts.
+    loads_measures_in_foundation: false
+  - source_id: nintendo_top_selling_titles
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Top selling title sales units
+    url: https://www.nintendo.co.jp/ir/en/finance/software/index.html
+    grain: >
+      Worldwide life-to-date software units for one printed title and one
+      platform page. A parenthetical combined total stays in the row note.
+    loads_measures_in_foundation: false
+  - source_id: nintendo_financial_results_explanatory
+    source_class: official_ir
+    publisher: Nintendo Co., Ltd.
+    title: Financial results explanatory material
+    url: https://www.nintendo.co.jp/ir/en/finance/index.html
+    grain: >
+      Quarterly earnings decks. A column labeled Q1-Q3 is the April 1 through
+      December 31 cumulative total. A point labeled Q3 on a quarterly trend is
+      the single October through December quarter. Sell-in unit tables, yen
+      statement lines, life-to-date title totals, and company forecasts are
+      separate measures. Individual PDFs are registered in a later phase with
+      the verbatim column header, document hash, and as-of date.
+    loads_measures_in_foundation: false
+  - source_id: igdb_game_metadata
+    source_class: public_reference
+    publisher: IGDB
+    title: IGDB game metadata
+    url: https://api.igdb.com/v4/games
+    grain: >
+      One public game name and optional first-release timestamp. This source
+      has no unit sales. It is unavailable until Twitch client credentials
+      are set. It does not load official measures.
+    loads_measures_in_foundation: false
+  - source_id: licensed_public_sales
+    source_class: public_reference
+    publisher: Unbundled
+    title: Licensed public sales file
+    url: https://example.invalid/licensed-public-sales
+    grain: >
+      One row from a file the operator places locally with a license name
+      and license URL. No third-party sales file is bundled. Rows stay out
+      of the official facts.
+    loads_measures_in_foundation: false
+  - source_id: authored_reference_dimensions
+    source_class: public_reference
+    publisher: Nintendo Intelligence Hub
+    title: Platform, region, metric, and fiscal calendar reference
+    url: https://www.nintendo.co.jp/ir/en/finance/index.html
+    grain: Dimension attributes and fiscal calendar dates. No measures.
+    loads_measures_in_foundation: false
+  - source_id: synthetic_weekly_sell_through
+    source_class: simulated_operational
+    publisher: SYNTHETIC
+    title: Synthetic weekly sell-through generator
+    url: https://example.invalid/synthetic-weekly-sell-through
+    grain: >
+      One synthetic sell-through quantity per ISO week, synthetic SKU,
+      synthetic region, and synthetic channel. It is generated by
+      ingestion.simulate and stored only in raw_simulated.
+    loads_measures_in_foundation: true

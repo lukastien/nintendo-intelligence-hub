@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nih
+          POSTGRES_PASSWORD: nih_local_only
+          POSTGRES_DB: nintendo_intel
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U nih -d nintendo_intel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NIH_WAREHOUSE_TARGET: postgres
+      NIH_POSTGRES_HOST: localhost
+      NIH_POSTGRES_PORT: "54329"
+      NIH_POSTGRES_DB: nintendo_intel
+      NIH_POSTGRES_USER: nih
+      NIH_POSTGRES_PASSWORD: nih_local_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Initialize the local warehouse
+        run: nih init-db
+      - name: Check catalogs and database purity
+        run: nih check --require-db
+      - name: Test
+        run: pytest
+      - name: Parse dbt
+        run: dbt parse --project-dir transformations/dbt --profiles-dir transformations/dbt
+      - name: Build dbt views
+        run: dbt build --project-dir transformations/dbt --profiles-dir transformations/dbt

@@ -1,0 +1,26 @@
+version: 2
+
+sources:
+  - name: raw_official
+    schema: raw_official
+    description: Landing tables for Nintendo Co., Ltd. disclosures. The foundation leaves them empty.
+    tables:
+      - name: unit_sales_disclosure
+        description: "GRAIN: one disclosed sell-in measure for one document, platform scope, region scope, optional title, and period span."
+      - name: financial_line
+        description: "GRAIN: one consolidated statement amount for one document, metric, region scope, and period span."
+  - name: raw_simulated
+    schema: raw_simulated
+    description: Landing tables for synthetic operational series.
+    tables:
+      - name: weekly_sell_through
+        description: "GRAIN: one synthetic sell-through quantity per ISO week, SKU, region, and channel."
+  - name: ref
+    schema: ref
+    description: Reference dimensions. These tables store no official measures.
+    tables:
+      - name: dim_platform
+      - name: dim_region
+      - name: dim_game
+      - name: dim_metric
+      - name: dim_date

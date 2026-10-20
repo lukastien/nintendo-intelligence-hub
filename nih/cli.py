@@ -1,0 +1,190 @@
+"""Command line for the local warehouse foundation."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+from datetime import date
+from decimal import Decimal
+
+from ingestion.registry import load_metric_catalog, load_source_catalog
+from nih import __version__
+from nih.config import describe_target, load_settings
+from nih.errors import ConfigurationError, NihError
+from nih.fiscal import fiscal_quarter, fiscal_year_ending
+from nih.periods import (
+    DisclosureMeasure,
+    PeriodSpan,
+    ProductGrain,
+    derive_reported_incremental,
+)
+from nih.provenance import SourceClass
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="nih")
+    sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("version", help="Print the foundation version")
+    check = sub.add_parser("check", help="Validate catalogs and the grain self-check")
+    check.add_argument(
+        "--require-db",
+        action="store_true",
+        help="Fail when local PostgreSQL cannot be audited",
+    )
+    sub.add_parser("init-db", help="Apply DDL, reference data, and the synthetic sample")
+    ingest = sub.add_parser("ingest", help="Download and parse public sources")
+    ingest.add_argument(
+        "--source",
+        action="append",
+        dest="sources",
+        help="Source id to ingest. Repeat to select more than one. Default: all sources.",
+    )
+    ingest.add_argument(
+        "--skip-warehouse",
+        action="store_true",
+        help="Write raw and cleaned files without loading PostgreSQL",
+    )
+    args = parser.parse_args(argv)
+
+    if args.command == "version":
+        print(__version__)
+        return 0
+    if args.command == "check":
+        return _check(require_db=args.require_db)
+    if args.command == "init-db":
+        return _init_db()
+    if args.command == "ingest":
+        return _ingest(args.sources, load_warehouse=not args.skip_warehouse)
+    parser.error(f"unknown command {args.command}")
+    return 2
+
+
+def _check(require_db: bool) -> int:
+    settings = load_settings()
+    sources = load_source_catalog()
+    metrics = load_metric_catalog()
+    _derivation_self_check()
+    today = date.today()
+    official = sum(1 for source in sources if source.source_class is SourceClass.OFFICIAL_IR)
+    simulated = sum(
+        1 for source in sources if source.source_class is SourceClass.SIMULATED_OPERATIONAL
+    )
+    print(f"Nintendo Intelligence Hub {__version__}")
+    print(f"warehouse target: {describe_target(settings)}")
+    print(f"sources: {official} official_ir, {simulated} simulated_operational")
+    print(f"metrics: {len(metrics)}")
+    print(
+        "fiscal date: "
+        f"FY3/{fiscal_year_ending(today)} Q{fiscal_quarter(today)} "
+        f"({today.isoformat()})"
+    )
+    print("synthetic derivation self-check: ok")
+    from warehouse.audit import audit_database, database_reachable
+
+    if not database_reachable(settings):
+        if require_db:
+            print("database audit failed: PostgreSQL is not reachable")
+            return 1
+        print("database audit: skipped")
+        return 0
+    try:
+        counts = audit_database(settings)
+    except Exception as exc:
+        print(f"database audit failed: {exc}")
+        return 1
+    print(
+        "database audit: ok "
+        f"(official unit rows {counts['official_unit_rows']}, "
+        f"official financial rows {counts['official_financial_rows']}, "
+        f"simulated rows {counts['simulated_rows']})"
+    )
+    return 0
+
+
+def _derivation_self_check() -> None:
+    """Exercise the grain rules on an obvious synthetic pair."""
+
+    first = DisclosureMeasure(
+        source_document_id="synthetic_self_check_q1",
+        source_class=SourceClass.OFFICIAL_IR,
+        metric_code="hw_units_sell_in",
+        product_grain=ProductGrain.HARDWARE,
+        platform_code="SYN_PLATFORM",
+        region_code="SYN_REGION",
+        fiscal_year_ending=2099,
+        period_span=PeriodSpan.Q1,
+        period_start=date(2098, 4, 1),
+        period_end=date(2098, 6, 30),
+        as_of_date=date(2098, 6, 30),
+        value=Decimal("1000"),
+    )
+    second = DisclosureMeasure(
+        source_document_id="synthetic_self_check_h1",
+        source_class=SourceClass.OFFICIAL_IR,
+        metric_code="hw_units_sell_in",
+        product_grain=ProductGrain.HARDWARE,
+        platform_code="SYN_PLATFORM",
+        region_code="SYN_REGION",
+        fiscal_year_ending=2099,
+        period_span=PeriodSpan.Q1_Q2,
+        period_start=date(2098, 4, 1),
+        period_end=date(2098, 9, 30),
+        as_of_date=date(2098, 9, 30),
+        value=Decimal("1400"),
+    )
+    result = derive_reported_incremental([first, second])
+    by_quarter = {row.fiscal_quarter: row for row in result.quarters}
+    if by_quarter[1].incremental_value != Decimal("1000"):
+        raise NihError("Q1 year-to-date should equal the first quarter")
+    if by_quarter[2].incremental_value != Decimal("400"):
+        raise NihError("Q2 should be the H1 cumulative minus the Q1 cumulative")
+    if by_quarter[2].is_as_disclosed:
+        raise NihError("a differenced quarter is marked as derived")
+    if {gap.fiscal_quarter for gap in result.gaps} != {3, 4}:
+        raise NihError("missing later spans should remain gaps")
+
+
+def _init_db() -> int:
+    from warehouse.load import initialize_database
+
+    try:
+        summary = initialize_database()
+    except ConfigurationError as exc:
+        print(exc)
+        return 1
+    print("ddl: " + ", ".join(summary["ddl_scripts"]))
+    print(
+        "loaded reference rows: "
+        f"{summary['platforms']} platforms, {summary['regions']} regions, "
+        f"{summary['metrics']} metrics, {summary['dates']} dates"
+    )
+    print(f"simulated weekly rows: {summary['simulated_rows']}")
+    print(f"official unit rows: {summary['official_unit_rows']}")
+    print(f"official financial rows: {summary['official_financial_rows']}")
+    return 0
+
+
+def _ingest(sources: list[str] | None, *, load_warehouse: bool) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    from ingestion.pipeline import OFFICIAL_SOURCES, genuine_official_count, run_ingestion
+    from nih.errors import NihError
+
+    try:
+        outcomes = run_ingestion(sources, load_warehouse=load_warehouse)
+    except NihError as exc:
+        print(exc)
+        return 1
+    for outcome in outcomes:
+        print(
+            f"{outcome.source_id}: {outcome.status} "
+            f"accepted={outcome.accepted} rejected={outcome.rejected} "
+            f"missing={outcome.missing} warehouse_rows={outcome.warehouse_rows}"
+        )
+        print(f"  {outcome.message}")
+    official = [outcome for outcome in outcomes if outcome.source_id in OFFICIAL_SOURCES]
+    print(f"genuine official records accepted: {genuine_official_count(outcomes)}")
+    if any(outcome.status != "loaded" for outcome in official):
+        return 1
+    if any(outcome.warehouse_error for outcome in outcomes):
+        return 1
+    return 0

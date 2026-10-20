@@ -1,0 +1,12 @@
+nintendo_intel:
+  target: postgres
+  outputs:
+    postgres:
+      type: postgres
+      host: "{{ env_var('NIH_POSTGRES_HOST', 'localhost') }}"
+      user: "{{ env_var('NIH_POSTGRES_USER', 'nih') }}"
+      password: "{{ env_var('NIH_POSTGRES_PASSWORD', 'nih_local_only') }}"
+      port: "{{ env_var('NIH_POSTGRES_PORT', '54329') | as_number }}"
+      dbname: "{{ env_var('NIH_POSTGRES_DB', 'nintendo_intel') }}"
+      schema: dbt_nih
+      threads: 4

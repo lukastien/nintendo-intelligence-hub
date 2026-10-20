@@ -1,0 +1,89 @@
+metrics:
+  - metric_code: hw_units_sell_in
+    metric_name: Hardware sell-in units
+    measure_family: unit_sales
+    additive_flow: true
+    native_unit: units
+    sales_basis: sell_in
+    statement_scope: dedicated_platform
+    comparability_note: >
+      Company sell-in for one platform scope and one printed period span.
+      A family total already includes its component models.
+  - metric_code: sw_units_sell_in
+    metric_name: Software sell-in units
+    measure_family: unit_sales
+    additive_flow: true
+    native_unit: units
+    sales_basis: sell_in
+    statement_scope: dedicated_platform
+    comparability_note: >
+      Packaged software and the downloadable edition of packaged software,
+      including units bundled with hardware. Excludes download-only software
+      and add-on content. Platform-family treatment of Switch 2 Edition
+      packages, downloads, and upgrade packs follows the note printed on the
+      source document and is stored on the row.
+  - metric_code: net_sales_jpy
+    metric_name: Net sales
+    measure_family: income_statement
+    additive_flow: true
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: >
+      Consolidated Nintendo Co., Ltd. yen flow for the printed span.
+      Geographical lines remain consolidated regional sales.
+  - metric_code: dedicated_platform_net_sales_jpy
+    metric_name: Dedicated video game platform net sales
+    measure_family: income_statement
+    additive_flow: true
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: >
+      Broader than software unit sales. Includes hardware, accessories,
+      amiibo, download-only software, add-on content, and membership services
+      as grouped by the disclosure.
+  - metric_code: ip_related_net_sales_jpy
+    metric_name: IP related income
+    measure_family: income_statement
+    additive_flow: true
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: >
+      Movies, mobile content, royalties, and official-store merchandise as
+      grouped by the disclosure.
+  - metric_code: operating_profit_jpy
+    metric_name: Operating profit
+    measure_family: income_statement
+    additive_flow: true
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: Consolidated yen flow for the printed span.
+  - metric_code: ordinary_profit_jpy
+    metric_name: Ordinary profit
+    measure_family: income_statement
+    additive_flow: true
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: Consolidated yen flow for the printed span.
+  - metric_code: profit_attributable_to_owners_jpy
+    metric_name: Profit attributable to owners of parent
+    measure_family: income_statement
+    additive_flow: true
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: Consolidated yen flow for the printed span.
+  - metric_code: total_assets_jpy
+    metric_name: Total assets
+    measure_family: balance_sheet
+    additive_flow: false
+    native_unit: jpy
+    sales_basis: not_applicable
+    statement_scope: consolidated
+    comparability_note: >
+      Point-in-time stock. The year-to-date difference derivation rejects
+      this metric.

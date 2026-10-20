@@ -1,0 +1,31 @@
+select
+    source_document_id,
+    source_class,
+    metric_code,
+    product_grain,
+    platform_code,
+    region_code,
+    fiscal_year_ending,
+    period_span,
+    fiscal_quarter,
+    period_start,
+    period_end,
+    as_of_date,
+    measure_value as amount_yen,
+    amount_as_printed,
+    printed_scale,
+    currency_code,
+    entity_code,
+    is_forecast,
+    additive_flow,
+    concat_ws(
+        '|',
+        source_document_id,
+        coalesce(fiscal_year_ending::text, 'life'),
+        metric_code,
+        region_code,
+        period_span,
+        coalesce(fiscal_quarter::text, 'span'),
+        is_forecast::text
+    ) as grain_key
+from {{ ref('stg_official__financial_line') }}

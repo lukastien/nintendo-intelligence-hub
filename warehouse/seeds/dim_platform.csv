@@ -1,0 +1,8 @@
+platform_code,platform_name,family_code,is_aggregate,is_component,parent_platform_code,hardware_form,reference_note
+NSW_FAMILY,Nintendo Switch family,switch,true,false,,family,Aggregate of the original model and the OLED and Lite models. Keep this row separate from its components.
+NSW,Nintendo Switch,switch,false,true,NSW_FAMILY,home_console,Original model. Component of NSW_FAMILY.
+NSOLED,Nintendo Switch - OLED Model,switch,false,true,NSW_FAMILY,home_console,Component of NSW_FAMILY.
+NSLITE,Nintendo Switch Lite,switch,false,true,NSW_FAMILY,handheld,Component of NSW_FAMILY.
+NS2,Nintendo Switch 2,switch_2,false,false,,home_console,Public product name. This dimension stores no sales figures.
+WIIU,Wii U,wii_u,false,false,,home_console,Historical platform reference only.
+N3DS_FAMILY,Nintendo 3DS family,3ds,true,false,,family,Aggregate family label for disclosures that do not split 3DS models.

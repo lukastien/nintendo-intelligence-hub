@@ -1,0 +1,25 @@
+name: nintendo_intel
+version: "0.1.0"
+config-version: 2
+profile: nintendo_intel
+model-paths: ["models"]
+macro-paths: ["macros"]
+target-path: "target"
+log-path: "logs"
+clean-targets:
+  - target
+  - dbt_packages
+  - logs
+
+models:
+  nintendo_intel:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      reported:
+        +materialized: view
+        +schema: mart_reported
+      simulated:
+        +materialized: view
+        +schema: mart_simulated
