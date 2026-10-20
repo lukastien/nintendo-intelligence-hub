@@ -69,6 +69,13 @@ def main(argv: list[str] | None = None) -> int:
     monitor_commands.add_parser("status", help="Show active alerts by severity and monitoring health")
     monitor_history = monitor_commands.add_parser("history", help="Show recent alerts and status transitions")
     monitor_history.add_argument("--limit", type=int, default=20)
+    forecast = sub.add_parser("forecast", help="Run and inspect annual forecasting")
+    forecast_commands = forecast.add_subparsers(dest="forecast_command", required=True)
+    forecast_run = forecast_commands.add_parser("run", help="Backtest, select models, and persist forecasts")
+    forecast_run.add_argument("--horizon", type=int, default=3, help="Forecast years ahead (default 3)")
+    forecast_commands.add_parser("status", help="Show the latest forecast run and selected models")
+    forecast_history = forecast_commands.add_parser("history", help="Show recent forecast runs")
+    forecast_history.add_argument("--limit", type=int, default=10)
     ack = monitor_commands.add_parser("ack", help="Acknowledge an alert by fingerprint or id")
     ack.add_argument("alert")
     resolve = monitor_commands.add_parser("resolve", help="Resolve an alert by fingerprint or id")
@@ -88,6 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         return _pipeline(args)
     if args.command == "monitor":
         return _monitor(args)
+    if args.command == "forecast":
+        return _forecast(args)
     parser.error(f"unknown command {args.command}")
     return 2
 
@@ -272,6 +281,60 @@ def _pipeline(args) -> int:
     if result.error_message:
         print(result.error_message)
     return result.exit_code
+
+
+def _forecast(args) -> int:
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    from forecasting.pipeline import forecast_history, forecast_status, run_forecast
+
+    try:
+        if args.forecast_command == "run":
+            if args.horizon < 1 or args.horizon > 5:
+                print("--horizon must be between 1 and 5")
+                return 2
+            result = run_forecast(horizon=args.horizon)
+            print(f"run_id: {result.run_id}")
+            print(f"status: {result.status}")
+            print(
+                "series: "
+                f"total={result.series_total} selected={result.series_forecast} "
+                f"limited={result.series_limited} ineligible={result.series_ineligible}"
+            )
+            print(f"forecasts_written: {result.forecasts_written}")
+            for name, count in sorted(result.selected_models.items()):
+                print(f"selected {name}: {count} series")
+            if result.error_message:
+                print(result.error_message)
+            return result.exit_code
+        if args.forecast_command == "status":
+            status = forecast_status()
+            latest = status["latest"]
+            print("Nintendo Intelligence Hub forecast status")
+            if latest is None:
+                print("No forecast run has been recorded. Run: python -m nih forecast run")
+                return 0
+            print(f"latest run: {latest[0]} at {latest[1]} ({latest[2]})")
+            print(
+                "series: "
+                f"total={latest[3]} selected={latest[4]} limited={latest[5]} ineligible={latest[6]}"
+            )
+            print(f"forecasts written: {latest[7]}  model version: {latest[8]}")
+            for name, count in status["models"]:
+                print(f"selected {name}: {count} series")
+            return 0
+        rows = forecast_history(args.limit)
+        if not rows:
+            print("No forecast runs are recorded.")
+            return 0
+        for row in rows:
+            print(
+                f"{row[1]} {row[2]} run={str(row[0])[:8]} series={row[3]} "
+                f"selected={row[4]} limited={row[5]} ineligible={row[6]} forecasts={row[7]}"
+            )
+        return 0
+    except Exception as exc:
+        print(f"forecast {args.forecast_command} failed: {exc}")
+        return 2
 
 
 def _monitor(args) -> int:

@@ -593,6 +593,133 @@ def pipeline_health() -> None:
     st.caption("dbt tests require every official mart row to carry source_class = official_ir and fail if a synthetic label appears there.")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _forecast_runs(limit: int = 10):
+    return queries.forecast_runs(limit)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _forecasts(run_id: str):
+    return queries.forecasts_for_run(run_id)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _evaluations(run_id: str):
+    return queries.series_evaluations_for_run(run_id)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _folds(run_id: str):
+    return queries.backtest_folds_for_run(run_id)
+
+
+def _actuals_for_series(series_key: str) -> pd.DataFrame:
+    platform, metric = series_key.split(":", 1)
+    if platform == "CONSOLIDATED":
+        frame = _financial()
+        melted = frame[["fiscal_year_ending", metric]].dropna()
+        return pd.DataFrame({"fiscal_year_ending": melted["fiscal_year_ending"], "value": melted[metric]})
+    annual = _annual()
+    subset = annual[
+        (annual["platform_code"] == platform)
+        & (annual["metric_code"] == metric)
+        & (annual["region_code"] == "GLOBAL")
+        & (annual["observation_type"] == "annual_flow")
+    ]
+    return pd.DataFrame({"fiscal_year_ending": subset["fiscal_year_ending"], "value": subset["value_units"]})
+
+
+def predictive_analytics() -> None:
+    st.title("Predictive analytics")
+    st.warning(
+        "Independent statistical estimates for demonstration. These forecasts are not Nintendo "
+        "guidance, not company projections, and not investment advice. They are extrapolations of "
+        "historical annual disclosures and will be wrong whenever the business changes."
+    )
+    try:
+        runs = _forecast_runs(10)
+    except Exception as exc:
+        st.info(f"Forecast tables are unavailable: {exc}. Run `python -m nih forecast run`.")
+        return
+    if runs.empty:
+        st.info("No forecast run has been recorded. Run `python -m nih forecast run`.")
+        return
+    run = runs.iloc[0]
+    run_id = str(run["run_id"])
+    st.caption(
+        f"Latest forecast run {run_id[:8]} · {run['started_at']} · model version {run['model_version']} · "
+        f"series: {run['series_forecast']} selected, {run['series_limited']} limited, "
+        f"{run['series_ineligible']} ineligible of {run['series_total']}"
+    )
+    forecasts = _forecasts(run_id)
+    evaluations = _evaluations(run_id)
+    folds = _folds(run_id)
+    if forecasts.empty:
+        st.info("The latest run produced no forecasts. See the methodology notes below.")
+        return
+    series_keys = sorted(forecasts["series_key"].unique())
+    chosen = st.selectbox("Forecast series", series_keys)
+    series_forecasts = forecasts[forecasts["series_key"] == chosen].sort_values("forecast_year")
+    first = series_forecasts.iloc[0]
+    actuals = _actuals_for_series(chosen)
+    cards = st.columns(4)
+    with cards[0]:
+        components.kpi_card(st, "Training observations", format_count(int(first["train_observations"])), f"FY3/{int(first['train_start_year'])}–FY3/{int(first['train_end_year'])} annual flows only")
+    with cards[1]:
+        components.kpi_card(st, "Selected model", str(first["selected_model"]), str(first["eligibility_note"])[:120])
+    with cards[2]:
+        components.kpi_card(st, "Backtest folds", format_count(int(first["backtest_folds"])), "Expanding window; training uses earlier years only")
+    with cards[3]:
+        rmse = first["backtest_rmse"]
+        components.kpi_card(st, "Backtest RMSE", "—" if pd.isna(rmse) else f"{rmse:,.3g}", "One-year-ahead historical errors")
+    _chart_block(
+        f"Reported actuals and forecast — {chosen}",
+        charts.forecast_chart(actuals, series_forecasts, title=chosen, y_title=str(first["metric_name"])),
+        "Solid: reported annual actuals. Dashed: statistical forecast with an 80% residual interval. "
+        "The interval is empirical and is not a guarantee of coverage."
+        + ("" if bool(first["interval_calibrated"]) else " This series has too few backtest folds for a calibrated interval."),
+    )
+    st.dataframe(
+        series_forecasts[["forecast_year", "point_forecast", "interval_lower", "interval_upper", "selected_model", "status"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+    if series_forecasts["point_clipped"].any():
+        st.caption("Point forecasts below zero were floored at zero for this unit/net-sales series; the floor is recorded on each row.")
+    st.subheader("Model comparison (backtest, lower is better)")
+    comparison = evaluations[evaluations["series_key"] == chosen]
+    if comparison.empty:
+        st.caption("No model evaluations were stored for this series.")
+    else:
+        st.dataframe(
+            comparison[["model_name", "backtest_folds", "mae", "rmse", "wape", "smape", "bias", "selected", "fit_failures"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption(
+            "Selection uses backtest RMSE only, preferring a simpler model within 10% of the best. "
+            "WAPE/sMAPE are blank when negative actuals would make them misleading."
+        )
+    st.subheader("Backtest folds for the selected model")
+    series_folds = folds[(folds["series_key"] == chosen) & (folds["model_name"] == str(first["selected_model"]))]
+    if series_folds.empty:
+        st.caption("No scored folds. Gap years are never scored, and training always precedes the target year.")
+    else:
+        st.dataframe(
+            series_folds[["target_year", "train_observations", "prediction", "actual", "error"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    st.subheader("Data sufficiency and interpretation")
+    st.markdown(
+        "- Series whose reporting ended before the latest fiscal year are treated as retired platforms and are not forecast.\n"
+        "- A newly launched platform with one annual observation cannot be forecast responsibly and is excluded.\n"
+        "- Annual platform histories are short and structural breaks (launches, successor consoles, retirements) dominate them; "
+        "treat every forecast as a baseline extrapolation, not a business prediction.\n"
+        "- Synthetic weekly data is never used to train these models. Forecasts live in the `forecast` schema, outside the official marts."
+    )
+
+
 # ---------------------------------------------------------------- shell
 def main() -> None:
     components.apply_style(st)
@@ -627,6 +754,7 @@ def main() -> None:
             st.Page(regional_performance, title="Regional Performance", icon=":material/public:", url_path="regions"),
             st.Page(financial_intelligence, title="Financial Intelligence", icon=":material/payments:", url_path="financials"),
             st.Page(pipeline_health, title="Pipeline Health", icon=":material/monitoring:", url_path="pipeline"),
+            st.Page(predictive_analytics, title="Predictive Analytics", icon=":material/insights:", url_path="forecast"),
         ]
     )
     try:

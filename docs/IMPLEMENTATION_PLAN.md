@@ -49,6 +49,10 @@ Exit check: every loaded amount ties to a document URL and a verbatim header. `d
 
 Exit check: life-to-date rows are absent from the incremental marts. Where Nintendo prints both a year-to-date series and a single quarter, the derived quarter reconciles to the printed quarter or the difference is flagged.
 
+## Forecasting
+
+`forecasting/` builds annual series from the official marts (annual flows only, worldwide, non-component scopes), backtests naive/mean/moving-average/drift/trend baselines against SES, Holt, damped Holt, and ARIMA(1,1,0), and selects by backtest RMSE with a simplicity preference. Retired and launch-year platforms are ineligible by rule. Results persist in the `forecast` schema via `python -m nih forecast run`; the dashboard's Predictive Analytics page only reads stored runs. See [FORECASTING_METHODOLOGY.md](FORECASTING_METHODOLOGY.md) and [FORECAST_LIMITATIONS.md](FORECAST_LIMITATIONS.md).
+
 ## Monitoring and alerts
 
 `monitoring/` evaluates pipeline health, data quality, freshness, and annual business movements after a successful pipeline run and on demand via `python -m nih monitor run`. Findings persist as fingerprint-deduplicated alerts in `meta.monitoring_alerts` with an audited lifecycle; a repeated evaluation with unchanged data creates no new alerts. Business movements are informational, annual-only, and never inferred from life-to-date rows. Notifications are optional, disabled by default, and covered in [NOTIFICATION_SETUP.md](NOTIFICATION_SETUP.md).

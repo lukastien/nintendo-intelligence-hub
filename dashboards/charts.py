@@ -144,6 +144,48 @@ def _empty(title: str, message: str = "Not reported for this selection") -> go.F
     return _layout(figure)
 
 
+def forecast_chart(actual: pd.DataFrame, forecast: pd.DataFrame, *, title: str, y_title: str = "Value") -> go.Figure:
+    """Historical annual actuals (solid) with forecast points and interval band.
+
+    Actuals and forecasts are separate traces with distinct styling; the
+    forecast never continues the actual line as if it were reported.
+    """
+    if actual.empty:
+        return _empty(title, "No historical actuals for this series")
+    figure = go.Figure()
+    figure.add_trace(
+        go.Scatter(
+            x=actual["fiscal_year_ending"], y=actual["value"],
+            mode="lines+markers", name="Reported actual",
+            line={"color": CHARCOAL, "width": 2}, marker={"size": 5},
+        )
+    )
+    if not forecast.empty:
+        figure.add_trace(
+            go.Scatter(
+                x=forecast["forecast_year"], y=forecast["interval_upper"],
+                mode="lines", name="80% interval (upper)",
+                line={"color": TEAL, "width": 0}, showlegend=False, hoverinfo="skip",
+            )
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=forecast["forecast_year"], y=forecast["interval_lower"],
+                mode="lines", name="80% residual interval",
+                line={"color": TEAL, "width": 0}, fill="tonexty",
+                fillcolor="rgba(13, 148, 136, 0.18)",
+            )
+        )
+        figure.add_trace(
+            go.Scatter(
+                x=forecast["forecast_year"], y=forecast["point_forecast"],
+                mode="lines+markers", name="Forecast (estimate)",
+                line={"color": TEAL, "width": 2, "dash": "dash"}, marker={"size": 5},
+            )
+        )
+    return _layout(figure, y_title=y_title, x_title="Fiscal year ending", legend_entries=3)
+
+
 def annual_metric_chart(frame: pd.DataFrame, *, title: str, metric_label: str = "Units") -> go.Figure:
     data = frame.dropna(subset=["value_units"]) if not frame.empty and "value_units" in frame else frame
     if data.empty:

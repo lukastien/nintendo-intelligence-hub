@@ -192,6 +192,59 @@ def monitoring_evaluations(limit: int = 10, *, settings: Settings | None = None)
     )
 
 
+def forecast_runs(limit: int = 10, *, settings: Settings | None = None) -> pd.DataFrame:
+    return _query(
+        """
+        select run_id, started_at, finished_at, status, model_version, horizon_years,
+               series_total, series_forecast, series_limited, series_ineligible, forecasts_written
+        from forecast.forecast_runs
+        order by started_at desc
+        limit %s
+        """,
+        (int(limit),),
+        settings,
+    )
+
+
+def forecasts_for_run(run_id: str, *, settings: Settings | None = None) -> pd.DataFrame:
+    return _query(
+        """
+        select *
+        from forecast.forecasts
+        where run_id = %s
+        order by series_key, forecast_year
+        """,
+        (run_id,),
+        settings,
+    )
+
+
+def series_evaluations_for_run(run_id: str, *, settings: Settings | None = None) -> pd.DataFrame:
+    return _query(
+        """
+        select *
+        from forecast.series_evaluations
+        where run_id = %s
+        order by series_key, rmse nulls last
+        """,
+        (run_id,),
+        settings,
+    )
+
+
+def backtest_folds_for_run(run_id: str, *, settings: Settings | None = None) -> pd.DataFrame:
+    return _query(
+        """
+        select *
+        from forecast.backtest_folds
+        where run_id = %s
+        order by series_key, model_name, target_year
+        """,
+        (run_id,),
+        settings,
+    )
+
+
 def warehouse_counts(*, settings: Settings | None = None) -> dict[str, int]:
     frame = _query(
         """

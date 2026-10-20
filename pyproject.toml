@@ -19,6 +19,7 @@ dependencies = [
     "streamlit>=1.38",
     "plotly>=5.22",
     "scikit-learn>=1.5,<2",
+    "statsmodels>=0.14,<0.16",
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.2",
     "dbt-core>=1.8,<2",
