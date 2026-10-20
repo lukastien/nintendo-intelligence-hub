@@ -38,7 +38,9 @@ create table if not exists forecast.forecasts (
     interval_upper double precision,
     interval_level double precision not null default 0.8,
     interval_clipped boolean not null default false,
-    interval_calibrated boolean not null default false,
+    interval_fold_support boolean not null default false,
+    interval_method text not null default 'normal_approx_backtest_rmse',
+    lifecycle_stage text not null default 'active',
     selected_model text not null,
     backtest_folds integer not null default 0,
     backtest_mae double precision,
@@ -73,6 +75,8 @@ create table if not exists forecast.series_evaluations (
     bias double precision,
     selected boolean not null default false,
     fit_failures integer not null default 0,
+    interval_coverage double precision,
+    coverage_folds integer not null default 0,
     unique (run_id, series_key, model_name)
 );
 

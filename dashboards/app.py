@@ -450,7 +450,13 @@ def pipeline_health() -> None:
         "Run history from meta.pipeline_runs. Historical annual disclosures are judged on their publication schedule, not on daily age.",
     )
     runs = _pipeline(20)
-    counts = _counts()
+    try:
+        counts = _counts()
+    except Exception:
+        # Read-only demo role: raw schemas are intentionally not granted.
+        # The rest of this page (runs, monitoring, freshness) still works.
+        counts = {"official_unit_rows": 0, "official_financial_rows": 0, "simulated_rows": 0}
+        st.caption("Raw fact counts are unavailable under the read-only demo role; mart and monitoring data below are unaffected.")
     documents = _documents()
     if runs.empty:
         st.warning("No pipeline runs are recorded yet. Run `python -m nih pipeline run`.")
@@ -657,8 +663,17 @@ def predictive_analytics() -> None:
     if forecasts.empty:
         st.info("The latest run produced no forecasts. See the methodology notes below.")
         return
+    stage_by_series = (
+        forecasts.drop_duplicates("series_key").set_index("series_key")["lifecycle_stage"].to_dict()
+        if "lifecycle_stage" in forecasts
+        else {}
+    )
     series_keys = sorted(forecasts["series_key"].unique())
-    chosen = st.selectbox("Forecast series", series_keys)
+    chosen = st.selectbox(
+        "Forecast series",
+        series_keys,
+        format_func=lambda key: f"{key} ({stage_by_series.get(key, 'active').replace('_', ' ')})",
+    )
     series_forecasts = forecasts[forecasts["series_key"] == chosen].sort_values("forecast_year")
     first = series_forecasts.iloc[0]
     actuals = _actuals_for_series(chosen)
@@ -675,15 +690,21 @@ def predictive_analytics() -> None:
     _chart_block(
         f"Reported actuals and forecast — {chosen}",
         charts.forecast_chart(actuals, series_forecasts, title=chosen, y_title=str(first["metric_name"])),
-        "Solid: reported annual actuals. Dashed: statistical forecast with an 80% residual interval. "
-        "The interval is empirical and is not a guarantee of coverage."
-        + ("" if bool(first["interval_calibrated"]) else " This series has too few backtest folds for a calibrated interval."),
+        "Solid: reported annual actuals. Dashed: statistical forecast with an 80% interval "
+        "(normal approximation over backtest-residual RMSE — not empirical quantiles, not calibrated, "
+        "and not a guarantee of coverage)."
+        + ("" if bool(first["interval_fold_support"]) else " This series' interval rests on fewer than 3 backtest folds."),
     )
     st.dataframe(
         series_forecasts[["forecast_year", "point_forecast", "interval_lower", "interval_upper", "selected_model", "status"]],
         use_container_width=True,
         hide_index=True,
     )
+    if "lifecycle_stage" in series_forecasts and str(first["lifecycle_stage"]) == "end_of_life":
+        st.warning(
+            "End-of-life platform: recent annual values are at most 1% of this platform's historical peak. "
+            "This forecast extrapolates a reporting tail and is not an actionable commercial outlook."
+        )
     if series_forecasts["point_clipped"].any():
         st.caption("Point forecasts below zero were floored at zero for this unit/net-sales series; the floor is recorded on each row.")
     st.subheader("Model comparison (backtest, lower is better)")
@@ -700,6 +721,13 @@ def predictive_analytics() -> None:
             "Selection uses backtest RMSE only, preferring a simpler model within 10% of the best. "
             "WAPE/sMAPE are blank when negative actuals would make them misleading."
         )
+        selected_eval = comparison[comparison["selected"] == True]  # noqa: E712
+        if not selected_eval.empty and "interval_coverage" in selected_eval and pd.notna(selected_eval.iloc[0]["interval_coverage"]):
+            st.caption(
+                f"Historical interval coverage for the selected model: {selected_eval.iloc[0]['interval_coverage']:.0%} "
+                f"over {int(selected_eval.iloc[0]['coverage_folds'])} folds, each interval built only from earlier folds. "
+                "Coverage is a diagnostic, not calibration."
+            )
     st.subheader("Backtest folds for the selected model")
     series_folds = folds[(folds["series_key"] == chosen) & (folds["model_name"] == str(first["selected_model"]))]
     if series_folds.empty:
@@ -721,7 +749,36 @@ def predictive_analytics() -> None:
 
 
 # ---------------------------------------------------------------- shell
+def _apply_streamlit_secrets() -> None:
+    """Map Streamlit Cloud secrets to NIH_* environment variables.
+
+    On Streamlit Community Cloud there is no .env file; secrets are the
+    credential store. Locally this is a no-op. Existing environment
+    variables always win, and nothing is printed.
+    """
+    import os
+
+    try:
+        secrets = st.secrets
+    except Exception:
+        return
+    for key in (
+        "NIH_POSTGRES_HOST",
+        "NIH_POSTGRES_PORT",
+        "NIH_POSTGRES_DB",
+        "NIH_POSTGRES_USER",
+        "NIH_POSTGRES_PASSWORD",
+        "NIH_POSTGRES_SSLMODE",
+    ):
+        try:
+            if key in secrets:
+                os.environ.setdefault(key, str(secrets[key]))
+        except Exception:
+            continue
+
+
 def main() -> None:
+    _apply_streamlit_secrets()
     components.apply_style(st)
     with st.sidebar:
         st.markdown('<div class="nih-kicker">Nintendo Intelligence Hub</div>', unsafe_allow_html=True)

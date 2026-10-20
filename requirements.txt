@@ -1,0 +1,17 @@
+# Streamlit Community Cloud reads requirements.txt. This file mirrors the
+# runtime dependencies declared in pyproject.toml so the deployed app
+# installs the same stack as local development. Keep both in sync.
+pandas>=2.2,<3
+requests>=2.32
+pydantic>=2.7
+pydantic-settings>=2.4
+PyYAML>=6.0
+python-dotenv>=1.0
+streamlit>=1.38
+plotly>=5.22
+scikit-learn>=1.5,<2
+statsmodels>=0.14,<0.16
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+openpyxl>=3.1
+xlrd>=2.0.1

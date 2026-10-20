@@ -132,6 +132,26 @@ def test_build_series_excludes_lifetime_components_and_synthetic():
         build_series(annual, pd.DataFrame())
 
 
+def test_lifecycle_stage_and_leakage_free_coverage():
+    from forecasting.pipeline import _expanding_coverage, _lifecycle_stage
+    from forecasting.backtesting import Fold, ModelBacktest
+
+    tail = _series([1000, 900, 800, 5, 3, 2, 1])
+    assert _lifecycle_stage(tail) == "end_of_life"
+    active = _series([100, 200, 300, 400, 500, 600, 700])
+    assert _lifecycle_stage(active) == "active"
+    folds = [
+        Fold("m", 2090 + i, 4, prediction=100.0, actual=100.0 + delta)
+        for i, delta in enumerate([0.0, 1.0, -1.0, 2.0, 50.0, 0.5])
+    ]
+    coverage, scored = _expanding_coverage(ModelBacktest("m", folds=folds))
+    # First two folds cannot be scored (fewer than 2 earlier residuals).
+    assert scored == 4
+    assert coverage is not None and 0.0 <= coverage <= 1.0
+    outcome = evaluate_series(active, horizon=1)
+    assert outcome.forecasts[0]["lifecycle_stage"] == "active"
+
+
 @pytest.mark.integration
 def test_forecast_run_persists_in_isolated_schema_only():
     if not database_reachable():

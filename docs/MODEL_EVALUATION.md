@@ -35,8 +35,10 @@ why the methodology forbids declaring a winner from a single fold.
 The 80% interval is an empirical residual interval. Historical coverage
 can be computed per series from stored folds (share of actuals inside
 the would-be interval), but with the fold counts available here it is a
-diagnostic, not a calibration claim. The stored `interval_calibrated`
-flag marks series whose width rests on at least 3 folds.
+diagnostic, not a calibration claim. The stored `interval_fold_support` flag marks series whose σ rests
+on at least 3 folds; it is explicitly not a calibration claim.
+Leakage-free historical coverage (each fold's interval built only
+from earlier folds) is stored per selected model as a diagnostic.
 
 ## Worked interpretation
 

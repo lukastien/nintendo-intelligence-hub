@@ -11,7 +11,7 @@ Selection policy (see docs/FORECASTING_METHODOLOGY.md):
   simpler model (lower rank) within ``SIMPLICITY_TOLERANCE`` of the best
   RMSE is preferred.
 - If no model reaches the fold minimum, the naive forecast is reported
-  with status ``limited`` and an uncalibrated interval. That is a
+  with status ``limited`` and an interval with limited fold support. That is a
   transparency label, not a silent fallback to invented numbers: the
   naive value is a real, reproducible calculation.
 - Model fit failures are counted and stored, never hidden.
@@ -69,6 +69,9 @@ class SeriesOutcome:
     selected_model: str = ""
     backtests: dict[str, ModelBacktest] = field(default_factory=dict)
     forecasts: list[dict] = field(default_factory=list)
+    lifecycle_stage: str = "active"
+    interval_coverage: float | None = None
+    coverage_folds: int = 0
 
 
 @dataclass
@@ -124,7 +127,7 @@ def evaluate_series(series: AnnualSeries, *, horizon: int = DEFAULT_HORIZON) -> 
         reason = (
             f"No model reached {MIN_FOLDS_FOR_SELECTION} scored backtest folds "
             f"(best: {max((len(b.folds) for b in backtests.values()), default=0)}). "
-            "Reporting the naive last-value forecast with an uncalibrated interval."
+            "Reporting the naive last-value forecast; its interval rests on fewer than 3 folds."
         )
         chosen = backtests.get("naive_last", ModelBacktest("naive_last"))
     else:
@@ -148,6 +151,8 @@ def evaluate_series(series: AnnualSeries, *, horizon: int = DEFAULT_HORIZON) -> 
         )
     residuals = np.array([fold.error for fold in chosen.folds], dtype=float)
     sigma = residual_sigma(residuals, values)
+    coverage, coverage_folds = _expanding_coverage(chosen)
+    lifecycle = _lifecycle_stage(series)
     metrics = chosen.metrics
     forecasts = []
     for step, point in enumerate(points, start=1):
@@ -171,7 +176,8 @@ def evaluate_series(series: AnnualSeries, *, horizon: int = DEFAULT_HORIZON) -> 
                 "interval_lower": lower,
                 "interval_upper": upper,
                 "interval_clipped": clipped,
-                "interval_calibrated": len(chosen.folds) >= MIN_FOLDS_FOR_SELECTION,
+                "interval_fold_support": len(chosen.folds) >= MIN_FOLDS_FOR_SELECTION,
+                "lifecycle_stage": lifecycle,
                 "selected_model": model_name,
                 "backtest_folds": len(chosen.folds),
                 "backtest_mae": metrics["mae"],
@@ -190,7 +196,52 @@ def evaluate_series(series: AnnualSeries, *, horizon: int = DEFAULT_HORIZON) -> 
         selected_model=model_name,
         backtests=backtests,
         forecasts=forecasts,
+        lifecycle_stage=lifecycle,
+        interval_coverage=coverage,
+        coverage_folds=coverage_folds,
     )
+
+
+def _lifecycle_stage(series: AnnualSeries) -> str:
+    """Classify a series for presentation, not for eligibility.
+
+    A still-reporting platform whose last three annual values are at
+    most 1% of its historical peak is end-of-life: its forecast is a
+    tail extrapolation and must not be presented as an active-platform
+    commercial outlook.
+    """
+    if series.platform == "CONSOLIDATED":
+        return "consolidated"
+    values = np.asarray(series.values, dtype=float)
+    if values.size >= 3 and float(np.max(values)) > 0:
+        if float(np.max(values[-3:])) <= 0.01 * float(np.max(values)):
+            return "end_of_life"
+    return "active"
+
+
+def _expanding_coverage(chosen: ModelBacktest) -> tuple[float | None, int]:
+    """Historical interval coverage without temporal leakage.
+
+    Each fold's interval is built only from residuals of earlier folds
+    of the same model, so a fold never contributes to its own interval.
+    Returns (coverage, scored folds); coverage is None below 3 folds.
+    """
+    folds = chosen.folds
+    hits = 0
+    scored = 0
+    prior_errors: list[float] = []
+    for fold in folds:
+        if len(prior_errors) >= 2:
+            sigma = float(np.sqrt(np.mean(np.square(prior_errors))))
+            lower = fold.prediction - 1.2816 * sigma
+            upper = fold.prediction + 1.2816 * sigma
+            scored += 1
+            if lower <= fold.actual <= upper:
+                hits += 1
+        prior_errors.append(fold.error)
+    if scored < 3:
+        return None, scored
+    return hits / scored, scored
 
 
 def _select(backtests: dict[str, ModelBacktest]) -> str | None:
@@ -313,8 +364,8 @@ def _persist_outcome(connection, run_id: str, outcome: SeriesOutcome) -> None:
                 insert into forecast.series_evaluations
                     (run_id, series_key, metric_name, platform, model_name,
                      train_observations, backtest_folds, mae, rmse, wape, smape, bias,
-                     selected, fit_failures)
-                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     selected, fit_failures, interval_coverage, coverage_folds)
+                values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 on conflict (run_id, series_key, model_name) do nothing
                 """,
                 (
@@ -323,6 +374,8 @@ def _persist_outcome(connection, run_id: str, outcome: SeriesOutcome) -> None:
                     metrics["wape"], metrics["smape"], metrics["bias"],
                     name == outcome.selected_model and outcome.status == "selected",
                     len(result.failures),
+                    outcome.interval_coverage if name == outcome.selected_model else None,
+                    outcome.coverage_folds if name == outcome.selected_model else 0,
                 ),
             )
             for fold in result.folds:
@@ -347,11 +400,11 @@ def _persist_outcome(connection, run_id: str, outcome: SeriesOutcome) -> None:
                      train_start_year, train_end_year, train_observations,
                      forecast_year, horizon_step, point_forecast, point_clipped,
                      interval_lower, interval_upper, interval_level, interval_clipped,
-                     interval_calibrated, selected_model, backtest_folds,
+                     interval_fold_support, lifecycle_stage, selected_model, backtest_folds,
                      backtest_mae, backtest_rmse, backtest_wape, backtest_smape,
                      backtest_bias, status, eligibility_note, data_provenance, model_version)
                 values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 on conflict (run_id, series_key, forecast_year) do nothing
                 """,
                 (
@@ -360,7 +413,7 @@ def _persist_outcome(connection, run_id: str, outcome: SeriesOutcome) -> None:
                     series.observations, forecast["forecast_year"], forecast["horizon_step"],
                     forecast["point_forecast"], forecast["point_clipped"], forecast["interval_lower"],
                     forecast["interval_upper"], INTERVAL_LEVEL, forecast["interval_clipped"],
-                    forecast["interval_calibrated"], forecast["selected_model"],
+                    forecast["interval_fold_support"], forecast["lifecycle_stage"], forecast["selected_model"],
                     forecast["backtest_folds"], forecast["backtest_mae"],
                     forecast["backtest_rmse"], forecast["backtest_wape"],
                     forecast["backtest_smape"], forecast["backtest_bias"],

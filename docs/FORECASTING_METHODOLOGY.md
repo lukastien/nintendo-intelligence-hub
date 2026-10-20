@@ -57,7 +57,7 @@ Selection (`forecasting/pipeline.py`):
    best RMSE is preferred (complexity order: naive < mean < moving
    average < drift < trend < SES < Holt < damped Holt < ARIMA).
 3. If no model reaches 3 folds, the naive forecast is stored with
-   status `limited` and an uncalibrated interval.
+   status `limited`; its interval is labelled with its fold support.
 4. Selected model, folds, and all metrics are stored per series in
    `forecast.series_evaluations`; every fold is in
    `forecast.backtest_folds`.
@@ -66,8 +66,17 @@ Selection (`forecasting/pipeline.py`):
 
 80% intervals from backtest residuals: half-width
 \(z_{0.9} \cdot \sigma \cdot \sqrt{\text{step}}\), where σ is the selected
-model's one-step backtest RMSE. `interval_calibrated` is true only when
-the width came from ≥3 folds. No coverage is guaranteed.
+model's one-step backtest RMSE (a normal approximation — not empirical
+residual quantiles). Stored rows carry `interval_method =
+'normal_approx_backtest_rmse'` and `interval_fold_support` (true when
+σ came from ≥3 folds). Fold support is not calibration: three
+residuals cannot calibrate an interval, and no coverage is
+guaranteed. Historical coverage is computed per series from
+expanding, leakage-free fold intervals and stored as a diagnostic.
+Each forecast also carries a `lifecycle_stage`
+(`active` / `end_of_life` / `consolidated`); end-of-life series —
+recent values ≤1% of peak — are labelled tail extrapolations, and
+retired series remain ineligible.
 
 Documented floors: point forecasts and interval lower bounds for unit
 sales and net sales are floored at zero (`point_clipped` /
