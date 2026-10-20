@@ -190,6 +190,7 @@ def _titles(catalog, fetch, root: Path, moment: datetime):
             rejected,
             missing,
             message,
+            parsed_documents=len(documents),
         ),
         documents,
     )
@@ -290,27 +291,45 @@ def _load_warehouse(documents: list[ParsedDocument], outcomes: list[SourceOutcom
     if not official:
         return
     if not database_reachable():
-        note = " PostgreSQL was not reachable, so the warehouse was not updated."
+        message = "PostgreSQL was not reachable, so the warehouse was not updated."
         for outcome in outcomes:
             if outcome.source_class == "official_ir" and outcome.status == "loaded":
-                outcome.message += note
+                outcome.warehouse_error = message
+                outcome.message += f" {message}"
         return
     try:
         from ingestion.warehouse import load_documents
 
-        written = load_documents(official)
+        summary = load_documents(official)
     except Exception as exc:
         for outcome in outcomes:
             if outcome.source_class == "official_ir" and outcome.status == "loaded":
                 outcome.warehouse_error = str(exc)
                 outcome.message += f" Warehouse load failed: {exc}"
+        logger.exception("warehouse load failed")
         return
-    remaining = written
+    by_document = {item.source_document_id: item for item in summary.documents}
     for outcome in outcomes:
-        if outcome.source_class == "official_ir" and outcome.status == "loaded":
-            outcome.warehouse_rows = outcome.accepted
-            remaining -= outcome.accepted
-    logger.info("warehouse official rows written: %s", written)
+        if outcome.source_class != "official_ir" or outcome.status != "loaded":
+            continue
+        related = [document for document in official if document.source_id == outcome.source_id]
+        loads = [by_document[document.source_document_id] for document in related]
+        outcome.records_inserted = sum(item.inserted for item in loads)
+        outcome.records_updated = sum(item.updated for item in loads)
+        outcome.records_unchanged = sum(item.unchanged for item in loads)
+        outcome.records_removed = sum(item.removed for item in loads)
+        outcome.warehouse_rows = outcome.records_inserted + outcome.records_updated
+        outcome.message += (
+            f" Load inserted={outcome.records_inserted} updated={outcome.records_updated}"
+            f" unchanged={outcome.records_unchanged} removed={outcome.records_removed}."
+        )
+    logger.info(
+        "warehouse_load inserted=%s updated=%s unchanged=%s removed=%s",
+        summary.inserted,
+        summary.updated,
+        summary.unchanged,
+        summary.removed,
+    )
 
 
 def _fetch_or_manual(url: str, fetch: Fetcher, manual_dir: Path, suffix: str) -> tuple[bytes, str, str]:
@@ -403,6 +422,7 @@ def _loaded(document: ParsedDocument, prefix: str) -> SourceOutcome:
         rejected=len(document.rejections),
         missing=document.missing_cells,
         message=f"{prefix} Accepted {len(document.rows)} rows.",
+        parsed_documents=1,
     )
 
 

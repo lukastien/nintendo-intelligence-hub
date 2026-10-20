@@ -1,12 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install check test db-up db-down db-reset db-init ingest dbt-parse dbt-build app
+.PHONY: help install check test db-up db-down db-reset db-init ingest pipeline dbt-parse dbt-build app
 
 help:
 	@echo "install     Install the project and test tools"
 	@echo "db-up       Start local PostgreSQL"
 	@echo "db-init     Apply the schema, reference data, and synthetic sample"
 	@echo "ingest      Download public sources and load parsed official rows"
+	@echo "pipeline    Ingest, audit, build dbt marts, and record the run"
 	@echo "check       Validate catalogs, grain rules, and the database when it is up"
 	@echo "test        Run unit and integration tests"
 	@echo "dbt-parse   Parse the dbt project"
@@ -38,6 +39,9 @@ db-init:
 
 ingest:
 	nih ingest
+
+pipeline:
+	python -m nih pipeline run
 
 dbt-parse:
 	dbt parse --project-dir transformations/dbt --profiles-dir transformations/dbt

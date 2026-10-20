@@ -44,6 +44,23 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Write raw and cleaned files without loading PostgreSQL",
     )
+    pipeline = sub.add_parser("pipeline", help="Run or inspect the orchestrated ETL pipeline")
+    pipeline_commands = pipeline.add_subparsers(dest="pipeline_command", required=True)
+    run = pipeline_commands.add_parser("run", help="Ingest, validate, load, and build marts")
+    run.add_argument(
+        "--source",
+        action="append",
+        dest="sources",
+        help="Source id to include. Repeat to select more than one. Default: all sources.",
+    )
+    run.add_argument(
+        "--skip-dbt",
+        action="store_true",
+        help="Load and audit without running dbt build",
+    )
+    history = pipeline_commands.add_parser("history", help="Show recent pipeline executions")
+    history.add_argument("--limit", type=int, default=20)
+    pipeline_commands.add_parser("status", help="Show the latest run, freshness, and issues")
     args = parser.parse_args(argv)
 
     if args.command == "version":
@@ -55,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         return _init_db()
     if args.command == "ingest":
         return _ingest(args.sources, load_warehouse=not args.skip_warehouse)
+    if args.command == "pipeline":
+        return _pipeline(args)
     parser.error(f"unknown command {args.command}")
     return 2
 
@@ -168,9 +187,17 @@ def _ingest(sources: list[str] | None, *, load_warehouse: bool) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     from ingestion.pipeline import OFFICIAL_SOURCES, genuine_official_count, run_ingestion
     from nih.errors import NihError
+    from nih.pipeline import PipelineBusy, pipeline_lock
 
     try:
-        outcomes = run_ingestion(sources, load_warehouse=load_warehouse)
+        if load_warehouse:
+            with pipeline_lock():
+                outcomes = run_ingestion(sources, load_warehouse=True)
+        else:
+            outcomes = run_ingestion(sources, load_warehouse=False)
+    except PipelineBusy as exc:
+        print(exc)
+        return 2
     except NihError as exc:
         print(exc)
         return 1
@@ -188,3 +215,41 @@ def _ingest(sources: list[str] | None, *, load_warehouse: bool) -> int:
     if any(outcome.warehouse_error for outcome in outcomes):
         return 1
     return 0
+
+
+def _pipeline(args) -> int:
+    from nih.pipeline import configure_logging, pipeline_history, pipeline_status, run_pipeline
+
+    configure_logging()
+    if args.pipeline_command == "history":
+        try:
+            print(pipeline_history(args.limit))
+        except Exception as exc:
+            print(f"pipeline history failed: {exc}")
+            return 2
+        return 0
+    if args.pipeline_command == "status":
+        try:
+            print(pipeline_status())
+        except Exception as exc:
+            print(f"pipeline status failed: {exc}")
+            return 2
+        return 0
+    result = run_pipeline(args.sources, skip_dbt=args.skip_dbt)
+    print(f"pipeline_run_id: {result.run_id}")
+    print(f"status: {result.status}")
+    print(f"duration_seconds: {result.duration_seconds}")
+    print(f"documents_processed: {result.documents_processed}")
+    print(
+        "records: "
+        f"extracted={result.records_extracted} inserted={result.records_inserted} "
+        f"updated={result.records_updated} unchanged={result.records_unchanged} "
+        f"rejected={result.records_rejected}"
+    )
+    print(f"dbt_status: {result.dbt_status}")
+    print(f"validation_failures: {result.validation_failures}")
+    for warning in result.warnings:
+        print(f"warning: {warning}")
+    if result.error_message:
+        print(result.error_message)
+    return result.exit_code

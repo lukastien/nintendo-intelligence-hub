@@ -1,5 +1,9 @@
 name: ci
 
+# This job uses a temporary PostgreSQL service. The service is destroyed
+# with the runner. It checks that the project installs, initializes, and
+# passes tests. It does not persist official Nintendo rows.
+
 on:
   push:
   pull_request:

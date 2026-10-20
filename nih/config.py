@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     postgres_db: str = "nintendo_intel"
     postgres_user: str = "nih"
     postgres_password: str = "nih_local_only"
+    postgres_sslmode: str | None = None
     bigquery_project: str | None = None
     bigquery_dataset: str = "nintendo_intel"
     bigquery_location: str = "US"
@@ -96,7 +97,7 @@ def postgres_kwargs(settings: Settings | None = None) -> dict:
             "This foundation connects to local PostgreSQL. "
             "BigQuery is an optional later target and is not opened from here."
         )
-    return {
+    payload = {
         "host": settings.postgres_host,
         "port": settings.postgres_port,
         "dbname": settings.postgres_db,
@@ -104,3 +105,6 @@ def postgres_kwargs(settings: Settings | None = None) -> dict:
         "password": settings.postgres_password,
         "connect_timeout": 5,
     }
+    if settings.postgres_sslmode:
+        payload["sslmode"] = settings.postgres_sslmode
+    return payload

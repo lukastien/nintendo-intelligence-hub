@@ -1,0 +1,44 @@
+name: scheduled ingestion
+
+# Persistent ingestion. This workflow does not start PostgreSQL.
+# A run writes to the database named by the NIH_POSTGRES_* secrets.
+# Leave those secrets unset, and disable this workflow, until that
+# database is a durable host rather than a CI service container.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 16 * * 1"
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Require a persistent warehouse
+        env:
+          NIH_POSTGRES_HOST: ${{ secrets.NIH_POSTGRES_HOST }}
+        run: |
+          if [ -z "$NIH_POSTGRES_HOST" ]; then
+            echo "NIH_POSTGRES_HOST is not set."
+            echo "Scheduled ingestion refuses to start a temporary database."
+            echo "Configure the NIH_POSTGRES_* secrets for a durable host, or disable this workflow."
+            exit 1
+          fi
+      - name: Run the pipeline
+        env:
+          NIH_WAREHOUSE_TARGET: postgres
+          NIH_POSTGRES_HOST: ${{ secrets.NIH_POSTGRES_HOST }}
+          NIH_POSTGRES_PORT: ${{ secrets.NIH_POSTGRES_PORT }}
+          NIH_POSTGRES_DB: ${{ secrets.NIH_POSTGRES_DB }}
+          NIH_POSTGRES_USER: ${{ secrets.NIH_POSTGRES_USER }}
+          NIH_POSTGRES_PASSWORD: ${{ secrets.NIH_POSTGRES_PASSWORD }}
+          NIH_POSTGRES_SSLMODE: ${{ secrets.NIH_POSTGRES_SSLMODE }}
+          NIH_IGDB_CLIENT_ID: ${{ secrets.NIH_IGDB_CLIENT_ID }}
+          NIH_IGDB_CLIENT_SECRET: ${{ secrets.NIH_IGDB_CLIENT_SECRET }}
+        run: python -m nih pipeline run

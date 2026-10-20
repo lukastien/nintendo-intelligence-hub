@@ -26,6 +26,10 @@ Exit check: `pytest` passes and `dbt build` passes. `nih init-db` does not inser
 
 `dbt build` publishes five official marts in `mart_reported`: annual platform performance, hardware and software trends, regional performance, lifetime platform sales, and consolidated financial performance. Each mart keeps the printed grain. Fiscal-year rows stay annual flows. Life-to-date rows stay point-in-time totals and are not summed across as-of dates. The incremental quarter marts stay empty until a file with `q1`, `q1_q2`, or `q1_q3` columns is loaded. Definitions, lineage, example queries, and the quarterly gap are in [BUSINESS_METRICS.md](BUSINESS_METRICS.md), [DATA_LINEAGE.md](DATA_LINEAGE.md), [EXAMPLE_QUERIES.md](EXAMPLE_QUERIES.md), [WAREHOUSE_LIMITATIONS.md](WAREHOUSE_LIMITATIONS.md), and [QUARTERLY_READINESS.md](QUARTERLY_READINESS.md).
 
+## Pipeline orchestration
+
+`python -m nih pipeline run` downloads the configured sources, loads PostgreSQL, audits purity, runs `dbt build`, checks that the marts are queryable, and writes `meta.pipeline_runs`. A repeated run with the same file checksum does not insert another copy of those rows. An unavailable source leaves the previous document in place. Optional IGDB and licensed-file gaps are warnings. The commands, failure modes, and the difference between CI and a durable warehouse are in [PIPELINE_OPERATIONS.md](PIPELINE_OPERATIONS.md), [PIPELINE_ARCHITECTURE.md](PIPELINE_ARCHITECTURE.md), and [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Phase 1 — One reviewed official document
 
 - Register each explanatory PDF in `meta.source_document` with URL, publication date, SHA-256, and the verbatim column header

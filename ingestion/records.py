@@ -64,6 +64,11 @@ class SourceOutcome:
     message: str
     warehouse_rows: int = 0
     warehouse_error: str = ""
+    records_inserted: int = 0
+    records_updated: int = 0
+    records_unchanged: int = 0
+    records_removed: int = 0
+    parsed_documents: int = 0
 
 
 CLEANED_COLUMNS = (
