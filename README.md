@@ -64,6 +64,8 @@ dbt build --project-dir transformations/dbt --profiles-dir transformations/dbt
 streamlit run dashboards/app.py
 ```
 
+The dashboard has five pages — Executive Overview, Hardware & Software, Regional Performance, Financial Intelligence, and Pipeline Health — documented in [docs/DASHBOARD_GUIDE.md](docs/DASHBOARD_GUIDE.md) and [docs/DASHBOARD_METRICS.md](docs/DASHBOARD_METRICS.md). Tableau-ready exports and connection instructions are in [docs/TABLEAU_INTEGRATION.md](docs/TABLEAU_INTEGRATION.md).
+
 `make install`, `make db-up`, `make db-init`, `make test`, `make dbt-build`, and `make app` wrap those commands.
 
 The Compose file publishes PostgreSQL on host port **54329**, database `nintendo_intel`, user `nih`. The password in `.env.example` is a local default.

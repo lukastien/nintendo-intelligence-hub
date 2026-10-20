@@ -49,6 +49,10 @@ Exit check: every loaded amount ties to a document URL and a verbatim header. `d
 
 Exit check: life-to-date rows are absent from the incremental marts. Where Nintendo prints both a year-to-date series and a single quarter, the derived quarter reconciles to the printed quarter or the difference is flagged.
 
+## Business intelligence dashboard
+
+`streamlit run dashboards/app.py` serves five pages over the official marts: Executive Overview, Hardware & Software, Regional Performance, Financial Intelligence, and Pipeline Health. All official figures are read from PostgreSQL with parameterized queries; nothing is hardcoded. Life-to-date snapshots are never summed or charted as annual sales, and component models are excluded from cross-platform totals. Tableau CSV exports come from `python scripts/export_tableau.py`. See [DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md), [DASHBOARD_METRICS.md](DASHBOARD_METRICS.md), and [TABLEAU_INTEGRATION.md](TABLEAU_INTEGRATION.md).
+
 ## Phase 3 — Reported dashboard
 
 - Add Streamlit pages that read only `mart_reported`
