@@ -6,6 +6,26 @@ An end-to-end business intelligence system built on **genuine Nintendo investor-
 
 **Public demo:** not yet deployed. Deployment is fully prepared (read-only database role verified, Streamlit Cloud instructions in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)); the remaining steps need the owner's cloud accounts — see [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md).
 
+## Dashboard preview
+
+Screenshots of the live dashboard running against the local PostgreSQL warehouse. Every figure shown is queried from genuine Nintendo IR disclosures at runtime.
+
+![Executive Overview dashboard showing worldwide hardware and software KPI cards for FY3/2026, consolidated net sales, and operating profit with margin](assets/screenshots/executive-overview.jpg)
+
+**Executive Overview** — the recruiter's starting point: worldwide annual hardware/software sell-in and consolidated financial KPIs for the selected fiscal year, with comparable year-over-year growth shown only when the same platform scopes reported in both years.
+
+![Platform Performance dashboard for the Nintendo Switch family showing annual hardware units, software units, and software per hardware unit for FY3/2026](assets/screenshots/platform-performance.jpg)
+
+**Platform Performance** — per-platform annual flows with family/component double-counting prevented structurally, software attach rates, and life-to-date snapshots kept strictly separate from annual sales.
+
+![Predictive Analytics dashboard showing training observations, the selected naive model, backtest folds and RMSE, and a forecast chart for consolidated net sales](assets/screenshots/predictive-analytics.jpg)
+
+**Predictive Analytics** — backtested forecasts with the selected model, fold count, and error metrics on the same card row as the prediction, plus an explicit not-Nintendo-guidance disclaimer. On consolidated net sales the naive model honestly wins the backtest, and the page says so.
+
+![Pipeline Health dashboard showing the latest succeeded pipeline run, duration, extracted record counts, and execution history](assets/screenshots/pipeline-health.jpg)
+
+**Pipeline Health** — operational transparency: run history, durations, inserted/updated/unchanged record counts proving idempotent loads, plus monitoring alerts and source freshness below.
+
 ## The business problem
 
 Nintendo reports hardware and software sell-in by platform and region, plus consolidated financials, in a mix of web pages and historical workbooks spanning decades of consoles. The reporting has traps: cumulative year-to-date columns that are not quarters, life-to-date snapshots next to annual flows, platform families that already include their component models, regional layouts that change definition over time, and disclosed negative values that are legitimate revisions. Any analyst who sums the wrong rows double-counts or mixes periods. This project builds the warehouse, safeguards, and analytics that make those figures safe to use.
@@ -57,7 +77,7 @@ flowchart LR
 
 ## Testing
 
-**Python: 100 passed. dbt: 72 results, 0 failures.** Suites cover fiscal/period logic, ingestion parsing, pipeline idempotency and failure modes, monitoring lifecycle, forecast leakage (a spy model proves training never sees the target year), and dashboard calculations. Run: `pytest` and `dbt build --project-dir transformations/dbt --profiles-dir transformations/dbt`.
+**Python: 103 passed. dbt: 72 results, 0 failures.** Suites cover fiscal/period logic, ingestion parsing, pipeline idempotency and failure modes, monitoring lifecycle, forecast leakage (a spy model proves training never sees the target year), and dashboard calculations. Run: `pytest` and `dbt build --project-dir transformations/dbt --profiles-dir transformations/dbt`.
 
 ## Local setup
 
