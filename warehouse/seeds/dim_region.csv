@@ -3,4 +3,5 @@ JPN,Japan,false,Sales region on Nintendo IR unit and geographical tables.,1
 AMR,The Americas,false,Consolidated sales region presented by Nintendo IR.,2
 EUR,Europe,false,Sales region on Nintendo IR unit and geographical tables.,3
 OTH,Other,false,Sales region on Nintendo IR unit and geographical tables.,4
-GLOBAL,Worldwide total,true,Worldwide total. Keep it separate from the four regional rows.,5
+GLOBAL,Worldwide total,true,Worldwide total. Keep it separate from the regional rows.,5
+OTH_INCL_EUROPE,"Other, including Europe",false,"Other on sheets that do not print a Europe column. Europe is inside this figure. Do not add it to EUR or to the later OTH column.",6

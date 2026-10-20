@@ -13,7 +13,7 @@ from nih.db import connect
 from nih.fiscal import build_date_dimension
 from warehouse.apply import apply_sql_directory
 
-DATE_START = date(2016, 4, 1)
+DATE_START = date(1990, 4, 1)
 DATE_END = date(2028, 3, 31)
 
 

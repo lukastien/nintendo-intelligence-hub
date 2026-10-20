@@ -113,3 +113,165 @@ models:
       - name: disclaimer
         tests:
           - not_null
+  - name: mart_annual_platform_performance
+    description: >
+      GRAIN: one disclosed fiscal-year sell-in flow for one metric, platform scope,
+      and region scope. Life-to-date totals, software-title rankings, and forecasts
+      are excluded. A family total and its component models are separate rows.
+      GLOBAL is separate from the regional rows. A later as-of date replaces an
+      earlier document for the same grain. This mart does not create quarters.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: fiscal_year_ending
+        tests:
+          - not_null
+      - name: period_span
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["fiscal_year"]
+      - name: observation_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["annual_flow"]
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+      - name: region_layout
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["worldwide_total", "europe_split", "europe_inside_other", "incomplete_regional_breakdown"]
+      - name: reconciliation_status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["exact", "within_one_printed_unit", "differs", "incomplete_breakdown", "mixed_region_layout"]
+  - name: mart_hardware_software_trends
+    description: >
+      GRAIN: one fiscal year, one non-component platform, and one region, with
+      annual hardware sell-in and annual software sell-in side by side. A missing
+      metric stays null. Component models are omitted so a family total is not
+      paired with a model-level hardware row. The ratio is calculated only when
+      both metrics are present and hardware is not zero.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: fiscal_year_ending
+        tests:
+          - not_null
+      - name: observation_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["annual_flow"]
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+  - name: mart_financial_performance
+    description: >
+      GRAIN: one consolidated Nintendo Co., Ltd. fiscal year. The four amount
+      columns are disclosed annual flows in yen. Margin columns are calculated
+      from those flows and are not the ratio lines printed on the income sheet.
+      The mart has no regional or platform split and no quarters.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: fiscal_year_ending
+        tests:
+          - not_null
+      - name: observation_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["annual_flow"]
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+      - name: margin_basis
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["calculated_from_disclosed_annual_flows"]
+      - name: entity_code
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["nintendo_co_ltd_consolidated"]
+  - name: mart_lifetime_platform_sales
+    description: >
+      GRAIN: one life-to-date hardware or software-total observation for one
+      source document, as-of date, metric, platform scope, and region. Two as-of
+      dates for the same platform remain two rows. is_latest_as_of marks the
+      later date and does not delete the earlier one. Software-title rankings
+      are not included. These rows are point-in-time totals, not annual sales.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: period_span
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["life_to_date"]
+      - name: observation_type
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["point_in_time_cumulative"]
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]
+  - name: mart_regional_performance
+    description: >
+      GRAIN: one disclosed fiscal-year sell-in flow for one metric, platform
+      scope, and non-worldwide region. GLOBAL is not a row; disclosed_global_units
+      repeats the worldwide total for that platform, metric, and year.
+      europe_split and europe_inside_other are different region definitions and
+      are not added together. reconciliation_status compares the disclosed
+      worldwide total with the sum of the parts in that one layout.
+    columns:
+      - name: grain_key
+        tests:
+          - unique
+          - not_null
+      - name: fiscal_year_ending
+        tests:
+          - not_null
+      - name: period_span
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["fiscal_year"]
+      - name: region_layout
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["europe_split", "europe_inside_other", "incomplete_regional_breakdown"]
+      - name: reconciliation_status
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["exact", "within_one_printed_unit", "differs", "incomplete_breakdown", "mixed_region_layout"]
+      - name: source_class
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["official_ir"]

@@ -20,6 +20,8 @@ models:
       reported:
         +materialized: view
         +schema: mart_reported
+        +persist_docs:
+          relation: true
       simulated:
         +materialized: view
         +schema: mart_simulated

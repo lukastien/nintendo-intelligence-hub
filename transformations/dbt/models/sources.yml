@@ -24,3 +24,9 @@ sources:
       - name: dim_game
       - name: dim_metric
       - name: dim_date
+  - name: meta
+    schema: meta
+    description: Document registry and load audit. These tables store no measures.
+    tables:
+      - name: source_document
+        description: "GRAIN: one retrieved document. Official rows keep the verbatim period label."

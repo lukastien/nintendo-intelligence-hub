@@ -22,6 +22,10 @@ Exit check: `pytest` passes and `dbt build` passes. `nih init-db` does not inser
 
 `nih ingest` loads four official IR sources: the dedicated life-to-date unit page, the top-title pages, the regional sales workbook, and the income workbook. Raw bytes and cleaned CSV files are written under gitignored data directories. Quarterly explanatory PDFs and the Euroland unit-sales iframe are not parsed. IGDB and an unbundled licensed file are reported unavailable until credentials or a manifest exist. See [DATA_SOURCES.md](DATA_SOURCES.md).
 
+## Analytics marts
+
+`dbt build` publishes five official marts in `mart_reported`: annual platform performance, hardware and software trends, regional performance, lifetime platform sales, and consolidated financial performance. Each mart keeps the printed grain. Fiscal-year rows stay annual flows. Life-to-date rows stay point-in-time totals and are not summed across as-of dates. The incremental quarter marts stay empty until a file with `q1`, `q1_q2`, or `q1_q3` columns is loaded. Definitions, lineage, example queries, and the quarterly gap are in [BUSINESS_METRICS.md](BUSINESS_METRICS.md), [DATA_LINEAGE.md](DATA_LINEAGE.md), [EXAMPLE_QUERIES.md](EXAMPLE_QUERIES.md), [WAREHOUSE_LIMITATIONS.md](WAREHOUSE_LIMITATIONS.md), and [QUARTERLY_READINESS.md](QUARTERLY_READINESS.md).
+
 ## Phase 1 — One reviewed official document
 
 - Register each explanatory PDF in `meta.source_document` with URL, publication date, SHA-256, and the verbatim column header

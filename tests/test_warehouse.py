@@ -67,8 +67,8 @@ def test_bootstrap_does_not_insert_official_measures(warehouse):
     assert again["official_unit_rows"] == warehouse["official_unit_rows"]
     assert again["official_financial_rows"] == warehouse["official_financial_rows"]
     assert warehouse["simulated_rows"] == 48
-    assert warehouse["platforms"] == 7
-    assert warehouse["regions"] == 5
+    assert warehouse["platforms"] == 24
+    assert warehouse["regions"] == 6
     assert warehouse["dates"] > 4000
 
 

@@ -19,6 +19,7 @@ select
     financial_line.currency_code,
     financial_line.entity_code,
     financial_line.is_forecast,
+    financial_line.definition_note,
     (
         financial_line.is_additive_flow
         and coalesce(dim_metric.additive_flow, false)

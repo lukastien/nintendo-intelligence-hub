@@ -93,6 +93,36 @@ Grain: one derived fiscal quarter per fiscal year, additive statement line, and 
 
 Same span rules. Stocks, forecasts, and life-to-date rows are absent.
 
+### `mart_reported.mart_annual_platform_performance`
+
+Grain: one fiscal-year sell-in flow for one metric, platform scope, and region scope.
+
+Hardware and software-total rows only. Life-to-date totals and software-title rankings stay out. `observation_type` is `annual_flow`. A family row and a component row are both present and are not additive. `GLOBAL` is not additive with the regional rows. `reconciliation_status` compares a disclosed worldwide total with the sum of one region layout. It does not rewrite either figure.
+
+### `mart_reported.mart_hardware_software_trends`
+
+Grain: one fiscal year, one non-component platform, and one region.
+
+Annual hardware units and annual software units sit on the same row. A missing side stays null. The software-per-hardware ratio is calculated only when both sides exist and hardware is not zero.
+
+### `mart_reported.mart_regional_performance`
+
+Grain: the annual grain without the `GLOBAL` row.
+
+`disclosed_global_units` repeats the worldwide total. `europe_split` and `europe_inside_other` are different region definitions.
+
+### `mart_reported.mart_lifetime_platform_sales`
+
+Grain: one life-to-date hardware or software-total observation for one source document, as-of date, metric, platform scope, and region.
+
+`observation_type` is `point_in_time_cumulative`. Two as-of dates remain two rows. `is_latest_as_of` marks the later document and does not delete the earlier one. Title rankings are not in this mart.
+
+### `mart_reported.mart_financial_performance`
+
+Grain: one consolidated fiscal year.
+
+The four yen columns are the disclosed annual flows. Margin columns are calculated from those flows. There is no region split, platform split, or quarter.
+
 ### `mart_reported.financial_line_as_disclosed`
 
 Grain: the same grain as `raw_official.financial_line`.
@@ -126,4 +156,4 @@ Forecasting and z-score alerts read this population. They reject `official_ir`.
 
 `meta.source_document` is one retrieved document or generator run. Official rows keep the verbatim period label. `meta.load_audit` is one bootstrap or load action. Neither table is a sales fact.
 
-The foundation ships these structures with official measure tables empty. Loading a real disclosure is a later phase and requires the source URL, document hash, verbatim column header, printed scale, and period span.
+`nih ingest` loads official disclosures into the fact tables. `nih init-db` still does not insert those measures. `ref.dim_date` covers April 1, 1990 through March 31, 2028.

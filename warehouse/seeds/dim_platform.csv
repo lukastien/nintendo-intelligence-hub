@@ -6,3 +6,20 @@ NSLITE,Nintendo Switch Lite,switch,false,true,NSW_FAMILY,handheld,Component of N
 NS2,Nintendo Switch 2,switch_2,false,false,,home_console,Public product name. This dimension stores no sales figures.
 WIIU,Wii U,wii_u,false,false,,home_console,Historical platform reference only.
 N3DS_FAMILY,Nintendo 3DS family,3ds,true,false,,family,Aggregate family label for disclosures that do not split 3DS models.
+FC_NES,Family Computer / NES,nes,false,false,,home_console,Historical dedicated platform. Not an aggregate of later models.
+GB,Game Boy,game_boy,false,false,,handheld,Historical dedicated platform.
+GBA,Game Boy Advance,game_boy_advance,true,false,,family,Family total when the sheet includes Game Boy Advance SP as of which.
+GBA_SP,Game Boy Advance SP,game_boy_advance,false,true,GBA,handheld,Component of GBA.
+SNES,Super Family Computer / SNES,snes,false,false,,home_console,Historical dedicated platform.
+N64,Nintendo 64,n64,false,false,,home_console,Historical dedicated platform.
+NGC,Nintendo GameCube,gamecube,false,false,,home_console,Historical dedicated platform.
+NDS_FAMILY,Nintendo DS,ds,true,false,,family,Family total. DS Lite, DSi, and DSi XL are components.
+NDS_LITE,Nintendo DS Lite,ds,false,true,NDS_FAMILY,handheld,Component of NDS_FAMILY.
+NDS_DSI,Nintendo DSi,ds,false,true,NDS_FAMILY,handheld,Component of NDS_FAMILY.
+NDS_DSIXL,Nintendo DSi XL,ds,false,true,NDS_FAMILY,handheld,Component of NDS_FAMILY.
+WII,Wii,wii,false,false,,home_console,Historical dedicated platform.
+N3DS_XL,Nintendo 3DS XL,3ds,false,true,N3DS_FAMILY,handheld,Component of N3DS_FAMILY.
+N2DS,Nintendo 2DS,3ds,false,true,N3DS_FAMILY,handheld,Component of N3DS_FAMILY.
+N3DS_NEW,New Nintendo 3DS,3ds,false,true,N3DS_FAMILY,handheld,Component of N3DS_FAMILY.
+N3DS_NEW_XL,New Nintendo 3DS XL,3ds,false,true,N3DS_FAMILY,handheld,Component of N3DS_FAMILY.
+N2DS_XL,New Nintendo 2DS XL,3ds,false,true,N3DS_FAMILY,handheld,Component of N3DS_FAMILY.

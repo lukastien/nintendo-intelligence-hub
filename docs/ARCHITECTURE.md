@@ -49,7 +49,7 @@ The warehouse target defaults to PostgreSQL on port 54329. BigQuery is a later t
 | `raw_official` | Disclosures as printed, after an explicit scale normalization |
 | `raw_simulated` | Synthetic weekly sell-through |
 | `staging` | dbt views over the landing tables |
-| `mart_reported` | Derived official quarters and financial disclosures |
+| `mart_reported` | Annual, regional, lifetime, and financial marts, plus quarter derivations when adjacent year-to-date spans exist |
 | `mart_simulated` | The synthetic weekly mart |
 | `meta` | Document registry and load audit |
 
